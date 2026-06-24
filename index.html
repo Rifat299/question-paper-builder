@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>প্রশ্নপত্র বিল্ডার | Question Paper Builder</title>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&family=Noto+Serif+Bengali:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+
+<!-- React + ReactDOM -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+
+<!-- Babel standalone (JSX transpiler) -->
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<!-- jsPDF + html2canvas -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<style>
+/* ── Reset & base ─────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-family:'Inter','Hind Siliguri',sans-serif;-webkit-font-smoothing:antialiased;background:#f5f3ee}
+body{min-height:100vh}
+
+/* ── Scrollbar ────────────────────────────────────── */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#d1d5db;border-radius:3px}
+
+/* ── Utility classes ──────────────────────────────── */
+.bn{font-family:'Hind Siliguri','Noto Serif Bengali',sans-serif;line-height:1.85}
+.bn-serif{font-family:'Noto Serif Bengali',serif;line-height:1.9}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;
+     font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s;white-space:nowrap}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:#4f63f8;color:#fff}.btn-primary:hover:not(:disabled){background:#3543ed}
+.btn-secondary{background:#fff;color:#1a1d2e;border:1px solid #e8e5de}.btn-secondary:hover{background:#f5f3ee}
+.btn-ghost{background:transparent;color:#6b7299;padding:6px 10px}.btn-ghost:hover{background:#f5f3ee}
+.btn-danger{background:transparent;color:#dc2626;padding:6px 10px}.btn-danger:hover{background:#fef2f2}
+.btn-sm{padding:5px 10px;font-size:12px;border-radius:6px}
+
+/* Cards */
+.card{background:#fff;border-radius:12px;border:1px solid #e8e5de;box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.06)}
+
+/* Inputs */
+.input{width:100%;padding:8px 12px;border:1px solid #e8e5de;border-radius:8px;font-size:13px;
+       color:#1a1d2e;background:#fff;outline:none;transition:border .15s,box-shadow .15s;
+       font-family:'Hind Siliguri','Inter',sans-serif}
+.input:focus{border-color:#9bb1fd;box-shadow:0 0 0 3px rgba(79,99,248,.15)}
+.textarea{width:100%;padding:8px 12px;border:1px solid #e8e5de;border-radius:8px;font-size:13px;
+          color:#1a1d2e;background:#fff;outline:none;resize:none;transition:border .15s,box-shadow .15s;
+          font-family:'Hind Siliguri','Inter',sans-serif;line-height:1.8}
+.textarea:focus{border-color:#9bb1fd;box-shadow:0 0 0 3px rgba(79,99,248,.15)}
+.label{display:block;font-size:11px;font-weight:600;color:#6b7299;text-transform:uppercase;
+       letter-spacing:.06em;margin-bottom:5px}
+
+/* Badges */
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600}
+.badge-mcq{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.badge-cq{background:#f5f3ff;color:#6d28d9;border:1px solid #ddd6fe;font-family:'Hind Siliguri',sans-serif}
+.badge-sq{background:#f0fdfa;color:#0f766e;border:1px solid #99f6e4}
+
+/* Layout */
+.toolbar{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.85);backdrop-filter:blur(12px);
+         border-bottom:1px solid #e8e5de;height:56px;display:flex;align-items:center;padding:0 20px;gap:12px}
+.logo-icon{width:34px;height:34px;border-radius:10px;background:#4f63f8;display:flex;align-items:center;
+           justify-content:center;color:#fff;font-size:16px;font-weight:900;font-family:'Noto Serif Bengali',serif}
+.logo-text p{font-size:13px;font-weight:700;color:#1a1d2e;line-height:1;font-family:'Hind Siliguri',sans-serif}
+.logo-text span{font-size:11px;color:#6b7299;line-height:1;margin-top:2px;display:block}
+
+.main{display:flex;gap:24px;max-width:1280px;margin:0 auto;padding:24px 20px;min-height:calc(100vh - 56px)}
+.editor-col{width:480px;flex-shrink:0;display:flex;flex-direction:column;gap:20px}
+.preview-col{flex:1;min-width:0}
+.preview-sticky{position:sticky;top:72px}
+
+/* Section header */
+.section-hdr{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;
+             color:#3d4166;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px}
+.section-hdr::before{content:'';display:inline-block;width:4px;height:16px;background:#4f63f8;border-radius:2px}
+
+/* Question card */
+.q-card{background:#fff;border-radius:12px;border:1px solid #e8e5de;border-left-width:4px;
+        box-shadow:0 1px 3px rgba(0,0,0,.06);transition:box-shadow .15s,outline .15s;margin-bottom:12px}
+.q-card.active{outline:2px solid #9bb1fd;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+.q-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.1)}
+.q-card.mcq-card{border-left-color:#3b82f6}
+.q-card.cq-card{border-left-color:#8b5cf6}
+.q-card.sq-card{border-left-color:#14b8a6}
+
+.q-card-head{display:flex;align-items:center;gap:8px;padding:12px 14px;cursor:pointer}
+.q-card-body{border-top:1px solid #e8e5de;padding:14px}
+
+.q-num{width:22px;height:22px;border-radius:50%;background:#1a1d2e;color:#fff;font-size:11px;
+       font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.q-preview{font-size:12px;color:#6b7299;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+           min-width:0;font-family:'Hind Siliguri',sans-serif}
+
+/* Drop zone */
+.dropzone{border:2px dashed #e8e5de;border-radius:12px;padding:32px;text-align:center;
+          cursor:pointer;transition:border-color .15s,background .15s}
+.dropzone:hover,.dropzone.drag-over{border-color:#9bb1fd;background:#f0f4ff}
+.dropzone-icon{font-size:28px;margin-bottom:8px}
+
+/* Notification */
+.notif{position:fixed;bottom:50px;left:50%;transform:translateX(-50%);
+       background:#fff;border:1px solid #e8e5de;box-shadow:0 8px 32px rgba(0,0,0,.12);
+       border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:10px;
+       min-width:260px;max-width:400px;z-index:9999;animation:slideup .25s ease-out}
+@keyframes slideup{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+
+/* Modal overlay */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);
+               z-index:100;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:#fff;border-radius:16px;box-shadow:0 16px 48px rgba(0,0,0,.2);
+       width:100%;max-width:520px;overflow:hidden}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;
+            border-bottom:1px solid #e8e5de}
+.modal-body{padding:24px}
+.modal-foot{display:flex;justify-content:flex-end;gap:10px;padding:16px 24px;border-top:1px solid #e8e5de}
+
+/* Math hint bar */
+.math-hint{position:fixed;bottom:0;left:0;right:0;background:#1a1d2e;color:rgba(255,255,255,.75);
+           font-size:11px;padding:5px;text-align:center;pointer-events:none;z-index:30}
+.math-hint code{background:rgba(255,255,255,.15);padding:1px 5px;border-radius:4px}
+
+/* Options grid */
+.opt-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.opt-lbl{width:28px;height:28px;border-radius:50%;background:#eff6ff;border:1px solid #bfdbfe;
+         display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;
+         color:#1d4ed8;flex-shrink:0;font-family:'Hind Siliguri',sans-serif}
+
+/* CQ sub */
+.cq-sub-row{display:flex;gap:10px;align-items:flex-start;margin-bottom:10px}
+.cq-mark-chip{width:24px;height:24px;border-radius:50%;background:#f5f3ff;border:1px solid #ddd6fe;
+              display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;
+              color:#6d28d9;flex-shrink:0;margin-top:20px}
+
+/* Add Q buttons */
+.add-btns{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+
+/* Preview panel */
+.preview-frame{background:#fff;border-radius:12px;border:1px solid #e8e5de;
+               box-shadow:0 4px 24px rgba(0,0,0,.1);overflow-y:auto;max-height:calc(100vh - 130px)}
+
+/* Toggle tabs (mobile) */
+.tab-bar{display:none;gap:4px;background:#f5f3ee;border:1px solid #e8e5de;border-radius:10px;padding:4px}
+.tab-btn{flex:1;padding:7px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;
+         border:none;background:transparent;color:#6b7299;transition:all .15s}
+.tab-btn.active{background:#fff;color:#1a1d2e;box-shadow:0 1px 4px rgba(0,0,0,.1)}
+
+/* Toggle switch */
+.toggle{position:relative;width:40px;height:20px;border-radius:10px;background:#e5e7eb;cursor:pointer;
+        transition:background .2s;flex-shrink:0;border:none}
+.toggle.on{background:#4f63f8}
+.toggle-dot{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;
+            background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .2s}
+.toggle.on .toggle-dot{transform:translateX(20px)}
+
+/* ── Preview / PDF print styles ──────────────────── */
+.preview-paper{font-family:'Noto Serif Bengali','Hind Siliguri',serif;font-size:12pt;
+               line-height:1.9;color:#111;background:#fff;padding:28px 32px}
+.paper-header{text-align:center;border-bottom:2.5px solid #111;padding-bottom:12px;margin-bottom:18px}
+.paper-header h1{font-size:17pt;font-weight:700;font-family:'Noto Serif Bengali',serif}
+.paper-header h2{font-size:13pt;font-weight:600;margin-top:4px;font-family:'Noto Serif Bengali',serif}
+.exam-meta{display:flex;justify-content:space-between;font-size:10pt;margin-top:8px}
+.exam-meta div{flex:1}
+.exam-meta div:nth-child(2){text-align:center}
+.exam-meta div:nth-child(3){text-align:right}
+.section-title{font-size:13pt;font-weight:700;border-bottom:1px solid #333;padding-bottom:3px;
+               margin:18px 0 10px;font-family:'Noto Serif Bengali',serif}
+.question-block{margin-bottom:14px;page-break-inside:avoid}
+.q-stem{font-weight:600;margin-bottom:5px}
+.mcq-options{display:grid;grid-template-columns:1fr 1fr;gap:3px 20px;margin-left:22px;font-size:11pt}
+.mcq-opt{display:flex;gap:5px;align-items:flex-start}
+.cq-stimulus{margin-left:20px;font-style:italic;border-left:3px solid #999;padding-left:10px;margin-bottom:8px;font-size:11pt}
+.cq-subs{margin-left:20px;font-size:11pt}
+.cq-sub-item{display:flex;gap:8px;margin-bottom:3px}
+.paper-footer{border-top:1px solid #555;margin-top:32px;padding-top:6px;font-size:9pt;color:#555;text-align:center}
+
+/* Correct answer highlight */
+.correct-opt{font-weight:700;color:#15803d}
+
+/* Empty preview */
+.preview-empty{text-align:center;padding:60px 20px;color:#9ca3af}
+.preview-empty .e-icon{font-size:40px;margin-bottom:12px}
+
+/* Drag handle */
+.drag-handle{cursor:grab;color:#9ca3af;padding:2px;flex-shrink:0}
+.drag-handle:hover{color:#6b7299}
+.drag-handle:active{cursor:grabbing}
+
+/* Spinner */
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin{animation:spin 1s linear infinite;display:inline-block}
+
+/* Responsive */
+@media(max-width:760px){
+  .editor-col{width:100%}
+  .preview-col{display:none}
+  .preview-col.mobile-show{display:block;flex:none;width:100%}
+  .editor-col.mobile-hide{display:none}
+  .tab-bar{display:flex}
+  .logo-text{display:none}
+  .main{gap:0;padding:12px}
+}
+
+/* Print */
+@media print{
+  .toolbar,.math-hint,.modal-overlay,.notif{display:none!important}
+  .main{display:block;padding:0}
+  .editor-col{display:none}
+  .preview-col{display:block}
+  .preview-frame{box-shadow:none;border:none;max-height:none;overflow:visible}
+  .preview-paper{padding:15mm 20mm}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useReducer, useContext, createContext, useRef, useEffect, useCallback } = React;
+
+/* ─────────────────────────────────────────────────────
+   HELPERS
+───────────────────────────────────────────────────── */
+let _uid = 0;
+const uid = () => `q_${Date.now()}_${++_uid}`;
+
+function renderMath(text = '') {
+  if (!text) return '';
+  // Split $$block$$ first then $inline$
+  let out = '';
+  const blockParts = text.split(/(\$\$[\s\S]+?\$\$)/g);
+  for (const seg of blockParts) {
+    if (seg.startsWith('$$') && seg.endsWith('$$')) {
+      const math = seg.slice(2,-2);
+      try { out += katex.renderToString(math, {displayMode:true, throwOnError:false}); }
+      catch { out += '<span style="color:red">[math err]</span>'; }
+    } else {
+      const inline = seg.split(/(\$[^$\n]+?\$)/g);
+      for (const p of inline) {
+        if (p.startsWith('$') && p.endsWith('$') && p.length > 2) {
+          const math = p.slice(1,-1);
+          try { out += katex.renderToString(math, {displayMode:false, throwOnError:false}); }
+          catch { out += '<span style="color:red">[math err]</span>'; }
+        } else {
+          out += p.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+      }
+    }
+  }
+  return out;
+}
+
+const MathText = ({ text, cls = '' }) => (
+  <span className={cls} dangerouslySetInnerHTML={{ __html: renderMath(text) }} />
+);
+
+/* ─────────────────────────────────────────────────────
+   STATE / STORE
+───────────────────────────────────────────────────── */
+const makeQ = (type) => {
+  const base = { id: uid(), type };
+  if (type==='mcq') return {...base, stem:'', options:{a:'',b:'',c:'',d:''}, correctAnswer:'', marks:1};
+  if (type==='cq')  return {...base, stimulus:'', subA:'', subB:'', subC:'', subD:'', marks:{a:1,b:2,c:3,d:4}};
+  return {...base, stem:'', marks:5};
+};
+
+const defHeader = { schoolName:'', examTitle:'', subject:'', time:'', totalMarks:'', year: String(new Date().getFullYear()), instructions:'' };
+
+const init = {
+  header: defHeader,
+  questions: [],
+  settings: {
+    geminiApiKey: localStorage.getItem('qpb_gemini_key') || '',
+    mcqOptionStyle: localStorage.getItem('qpb_mcq_style') || 'bangla',
+    showCorrectAnswer: false,
+  },
+  ui: { settingsOpen:false, activeQId:null, notification:null, mobileTab:'editor' },
+};
+
+function reducer(state, action) {
+  switch(action.type) {
+    case 'SET_HEADER':      return {...state, header:{...state.header,...action.p}};
+    case 'ADD_Q': {
+      const q = makeQ(action.p);
+      return {...state, questions:[...state.questions, q], ui:{...state.ui, activeQId:q.id}};
+    }
+    case 'UPD_Q':           return {...state, questions: state.questions.map(q => q.id===action.id ? {...q,...action.p} : q)};
+    case 'DEL_Q':           return {...state, questions: state.questions.filter(q=>q.id!==action.id),
+                                    ui:{...state.ui, activeQId: state.ui.activeQId===action.id ? null : state.ui.activeQId}};
+    case 'REORDER':         return {...state, questions: action.p};
+    case 'IMPORT_QS': {
+      const qs = action.p.map(q => ({...makeQ(q.type||'sq'), ...q, id:uid()}));
+      return {...state, questions:[...state.questions,...qs]};
+    }
+    case 'CLEAR':           return {...state, questions:[], header:defHeader};
+    case 'SET_SETTINGS':    return {...state, settings:{...state.settings,...action.p}};
+    case 'SAVE_KEY':
+      localStorage.setItem('qpb_gemini_key', action.p);
+      localStorage.setItem('qpb_mcq_style', state.settings.mcqOptionStyle);
+      return {...state, settings:{...state.settings, geminiApiKey:action.p}};
+    case 'NOTIFY':          return {...state, ui:{...state.ui, notification:action.p}};
+    case 'CLEAR_NOTIF':     return {...state, ui:{...state.ui, notification:null}};
+    case 'SET_ACTIVE':      return {...state, ui:{...state.ui, activeQId:action.p}};
+    case 'SETTINGS_OPEN':   return {...state, ui:{...state.ui, settingsOpen:action.p}};
+    case 'MOBILE_TAB':      return {...state, ui:{...state.ui, mobileTab:action.p}};
+    default: return state;
+  }
+}
+
+const Ctx = createContext(null);
+const useApp = () => useContext(Ctx);
+
+/* ─────────────────────────────────────────────────────
+   GEMINI API
+───────────────────────────────────────────────────── */
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+
+async function fileToB64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result.split(',')[1]);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+async function parseWithGemini(file, apiKey) {
+  if (!apiKey) throw new Error('No API key. Open ⚙ Settings first.');
+  const b64 = await fileToB64(file);
+  const prompt = `You are an expert reading Bangladeshi SSC/HSC exam papers. Extract ALL questions from this image as a JSON array ONLY — no markdown fences, no explanation.
+
+Schema:
+MCQ: {"type":"mcq","stem":"...","options":{"a":"...","b":"...","c":"...","d":"..."},"marks":1}
+CQ:  {"type":"cq","stimulus":"...","subA":"...","subB":"...","subC":"...","subD":"..."}
+SQ:  {"type":"sq","stem":"...","marks":5}
+
+Rules: preserve Bangla exactly. Wrap math in $...$ inline or $$...$$ block. Return ONLY a JSON array.`;
+
+  const body = {
+    contents:[{parts:[{text:prompt},{inline_data:{mime_type:file.type||'image/jpeg',data:b64}}]}],
+    generationConfig:{temperature:0.1,maxOutputTokens:4096}
+  };
+  const res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
+  });
+  if (!res.ok) { const e=await res.json().catch(()=>({})); throw new Error(e?.error?.message||`Gemini ${res.status}`); }
+  const data = await res.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const clean = text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+  try { const arr = JSON.parse(clean); if(!Array.isArray(arr)) throw 0; return arr; }
+  catch { throw new Error('Gemini returned invalid JSON. Check image quality.'); }
+}
+
+async function testKey(apiKey) {
+  const body = {contents:[{parts:[{text:'Reply: OK'}]}],generationConfig:{maxOutputTokens:5}};
+  const res = await fetch(`${GEMINI_URL}?key=${apiKey}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if (!res.ok) { const e=await res.json().catch(()=>({})); throw new Error(e?.error?.message||`Status ${res.status}`); }
+  return true;
+}
+
+/* ─────────────────────────────────────────────────────
+   PDF EXPORT
+───────────────────────────────────────────────────── */
+async function exportPDF(header) {
+  const el = document.getElementById('pdf-root');
+  if (!el) throw new Error('Preview not found');
+  const prev = el.style.cssText;
+  el.style.cssText = 'position:fixed;top:-99999px;left:0;width:794px;background:#fff;visibility:visible;display:block;z-index:-1';
+  try {
+    const canvas = await html2canvas(el, {scale:2,useCORS:true,backgroundColor:'#ffffff',width:794,logging:false});
+    el.style.cssText = prev;
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const W = pdf.internal.pageSize.getWidth();
+    const H = pdf.internal.pageSize.getHeight();
+    const margin = 12;
+    const contentW = W - margin*2;
+    const imgW = canvas.width, imgH = canvas.height;
+    const scale = contentW / (imgW/2);
+    const totalH = (imgH/2) * scale;
+    const usable = H - margin*2;
+    const imgData = canvas.toDataURL('image/png');
+
+    if (totalH <= usable) {
+      pdf.addImage(imgData,'PNG',margin,margin,contentW,totalH);
+    } else {
+      let pages = Math.ceil(totalH / usable);
+      for (let i=0; i<pages; i++) {
+        if (i>0) pdf.addPage();
+        const yOff = -(i * usable);
+        pdf.addImage(imgData,'PNG',margin,margin+yOff,contentW,totalH);
+        // white clip top/bottom
+        pdf.setFillColor(255,255,255);
+        pdf.rect(0,0,W,margin,'F');
+        pdf.rect(0,margin+usable,W,H,'F');
+      }
+    }
+    const name = `${(header.examTitle||'paper').replace(/\s+/g,'_')}_${(header.subject||'exam').replace(/\s+/g,'_')}.pdf`;
+    pdf.save(name);
+  } finally { el.style.cssText = prev; }
+}
+
+/* ─────────────────────────────────────────────────────
+   COMPONENTS
+───────────────────────────────────────────────────── */
+
+/* Notification */
+function Notification() {
+  const {state,dispatch} = useApp();
+  const n = state.ui.notification;
+  useEffect(()=>{ if(!n) return; const t=setTimeout(()=>dispatch({type:'CLEAR_NOTIF'}),4000); return ()=>clearTimeout(t); },[n]);
+  if (!n) return null;
+  const icons = {success:'✅',error:'❌',warning:'⚠️'};
+  const colors = {success:'#15803d',error:'#dc2626',warning:'#d97706'};
+  return (
+    <div className="notif">
+      <span style={{fontSize:16}}>{icons[n.type]||'ℹ️'}</span>
+      <span style={{fontSize:13,color:'#1a1d2e',flex:1}}>{n.message}</span>
+      <button className="btn btn-ghost btn-sm" onClick={()=>dispatch({type:'CLEAR_NOTIF'})}>✕</button>
+    </div>
+  );
+}
+
+/* Settings Modal */
+function SettingsModal() {
+  const {state,dispatch} = useApp();
+  if (!state.ui.settingsOpen) return null;
+  const [key,setKey] = useState(state.settings.geminiApiKey);
+  const [show,setShow] = useState(false);
+  const [testing,setTesting] = useState(false);
+  const [tRes,setTRes] = useState(null);
+  const [tMsg,setTMsg] = useState('');
+  const mcqStyle = state.settings.mcqOptionStyle;
+  const showAns  = state.settings.showCorrectAnswer;
+
+  const close = () => dispatch({type:'SETTINGS_OPEN',p:false});
+  const save  = () => {
+    dispatch({type:'SAVE_KEY',p:key.trim()});
+    dispatch({type:'SET_SETTINGS',p:{mcqOptionStyle:state.settings.mcqOptionStyle, showCorrectAnswer:showAns}});
+    localStorage.setItem('qpb_mcq_style', state.settings.mcqOptionStyle);
+    dispatch({type:'NOTIFY',p:{type:'success',message:'Settings saved!'}});
+    close();
+  };
+  const test  = async () => {
+    if (!key.trim()) return;
+    setTesting(true); setTRes(null);
+    try { await testKey(key.trim()); setTRes('ok'); setTMsg('API key works! ✓'); }
+    catch(e) { setTRes('fail'); setTMsg(e.message); }
+    finally { setTesting(false); }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={(e)=>{if(e.target===e.currentTarget)close()}}>
+      <div className="modal">
+        <div className="modal-head">
+          <span style={{fontWeight:700,fontSize:16,color:'#1a1d2e'}}>⚙️ Settings</span>
+          <button className="btn btn-ghost btn-sm" onClick={close}>✕</button>
+        </div>
+        <div className="modal-body" style={{display:'flex',flexDirection:'column',gap:20}}>
+
+          {/* API Key */}
+          <div>
+            <div style={{fontWeight:600,fontSize:13,marginBottom:8,display:'flex',alignItems:'center',gap:6}}>
+              🔑 Google Gemini API Key
+            </div>
+            <p style={{fontSize:12,color:'#6b7299',marginBottom:10,lineHeight:1.6}}>
+              Required for AI image extraction. Get a free key at{' '}
+              <a href="https://aistudio.google.com" target="_blank" rel="noreferrer" style={{color:'#4f63f8'}}>
+                aistudio.google.com</a>.
+              {' '}Stored only in your browser's localStorage — never sent to any server.
+            </p>
+            <div style={{position:'relative'}}>
+              <input
+                type={show?'text':'password'}
+                className="input" placeholder="AIza..."
+                value={key} onChange={e=>{setKey(e.target.value);setTRes(null)}}
+                style={{fontFamily:'monospace',fontSize:12,paddingRight:36}}
+              />
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{position:'absolute',right:2,top:'50%',transform:'translateY(-50%)'}}
+                onClick={()=>setShow(s=>!s)}
+              >{show?'🙈':'👁️'}</button>
+            </div>
+            {tRes && (
+              <div style={{marginTop:8,padding:'6px 10px',borderRadius:8,fontSize:12,
+                           background:tRes==='ok'?'#f0fdf4':'#fef2f2',
+                           color:tRes==='ok'?'#15803d':'#dc2626',
+                           border:`1px solid ${tRes==='ok'?'#bbf7d0':'#fecaca'}`}}>
+                {tMsg}
+              </div>
+            )}
+            <div style={{marginTop:8}}>
+              <button className="btn btn-secondary btn-sm" onClick={test} disabled={!key.trim()||testing}>
+                {testing ? <span className="spin">⟳</span> : null} Test Key
+              </button>
+            </div>
+          </div>
+
+          {/* MCQ style */}
+          <div>
+            <div style={{fontWeight:600,fontSize:13,marginBottom:10}}>MCQ Option Labels</div>
+            <div style={{display:'flex',gap:16}}>
+              {[{v:'bangla',l:'ক, খ, গ, ঘ (Bangla)'},{v:'latin',l:'a, b, c, d (Latin)'}].map(o=>(
+                <label key={o.v} style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer',fontSize:13}}>
+                  <input type="radio" name="mcqStyle" value={o.v}
+                    checked={mcqStyle===o.v}
+                    onChange={()=>dispatch({type:'SET_SETTINGS',p:{mcqOptionStyle:o.v}})}
+                  />
+                  <span style={{fontFamily:"'Hind Siliguri',sans-serif"}}>{o.l}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Show correct answer */}
+          <div style={{display:'flex',alignItems:'center',gap:12}}>
+            <button
+              className={`toggle ${showAns?'on':''}`}
+              onClick={()=>dispatch({type:'SET_SETTINGS',p:{showCorrectAnswer:!showAns}})}
+            >
+              <div className="toggle-dot"/>
+            </button>
+            <span style={{fontSize:13,color:'#1a1d2e'}}>Show correct answer in preview (MCQ)</span>
+          </div>
+        </div>
+        <div className="modal-foot">
+          <button className="btn btn-secondary" onClick={close}>Cancel</button>
+          <button className="btn btn-primary" onClick={save}>Save Settings</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* Header Editor */
+function HeaderEditor() {
+  const {state,dispatch} = useApp();
+  const h = state.header;
+  const set = k => e => dispatch({type:'SET_HEADER',p:{[k]:e.target.value}});
+  return (
+    <div className="card" style={{padding:18}}>
+      <div className="section-hdr">Paper Header</div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+        <div style={{gridColumn:'1/-1'}}>
+          <label className="label">School / College Name (বিদ্যালয়/কলেজের নাম)</label>
+          <input className="input bn" placeholder="e.g. ঢাকা সরকারি উচ্চ বিদ্যালয়" value={h.schoolName} onChange={set('schoolName')}/>
+        </div>
+        <div style={{gridColumn:'1/-1'}}>
+          <label className="label">Exam Title (পরীক্ষার নাম)</label>
+          <input className="input bn" placeholder="e.g. বার্ষিক পরীক্ষা ২০২৫" value={h.examTitle} onChange={set('examTitle')}/>
+        </div>
+        <div>
+          <label className="label">Subject (বিষয়)</label>
+          <input className="input bn" placeholder="e.g. পদার্থবিজ্ঞান" value={h.subject} onChange={set('subject')}/>
+        </div>
+        <div>
+          <label className="label">Year (সাল)</label>
+          <input className="input" placeholder="2025" value={h.year} onChange={set('year')}/>
+        </div>
+        <div>
+          <label className="label">Time (সময়)</label>
+          <input className="input bn" placeholder="৩ ঘণ্টা / 3 Hours" value={h.time} onChange={set('time')}/>
+        </div>
+        <div>
+          <label className="label">Total Marks (পূর্ণমান)</label>
+          <input className="input" placeholder="100" value={h.totalMarks} onChange={set('totalMarks')}/>
+        </div>
+        <div style={{gridColumn:'1/-1'}}>
+          <label className="label">Instructions (নির্দেশাবলি)</label>
+          <textarea className="textarea bn" rows={2}
+            placeholder="সকল প্রশ্নের উত্তর দিতে হবে।"
+            value={h.instructions} onChange={set('instructions')}/>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* MCQ Form */
+function MCQForm({q}) {
+  const {state,dispatch} = useApp();
+  const BN = {a:'ক',b:'খ',c:'গ',d:'ঘ'}, LA = {a:'a',b:'b',c:'c',d:'d'};
+  const labels = state.settings.mcqOptionStyle==='bangla' ? BN : LA;
+  const upd = p => dispatch({type:'UPD_Q',id:q.id,p});
+  const updOpt = (k,v) => upd({options:{...q.options,[k]:v}});
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:12}}>
+      <div>
+        <label className="label">Question Stem (প্রশ্ন)</label>
+        <textarea className="textarea" rows={3}
+          placeholder="Type MCQ question... Use $x^2$ for math"
+          value={q.stem||''} onChange={e=>upd({stem:e.target.value})}/>
+      </div>
+      {['a','b','c','d'].map(k=>(
+        <div key={k} className="opt-row">
+          <div className="opt-lbl">{labels[k]}</div>
+          <input className="input" style={{flex:1}} placeholder={`Option ${labels[k]}`}
+            value={q.options?.[k]||''} onChange={e=>updOpt(k,e.target.value)}/>
+          <label style={{display:'flex',alignItems:'center',gap:4,cursor:'pointer',flexShrink:0}} title="Mark as correct">
+            <input type="radio" name={`cor-${q.id}`} value={k}
+              checked={q.correctAnswer===k} onChange={()=>upd({correctAnswer:k})}
+              style={{accentColor:'#16a34a'}}/>
+            <span style={{fontSize:11,color:'#6b7299'}}>✓</span>
+          </label>
+        </div>
+      ))}
+      <div style={{display:'flex',alignItems:'center',gap:10}}>
+        <label className="label" style={{margin:0,whiteSpace:'nowrap'}}>Marks:</label>
+        <input type="number" min={1} max={10} className="input" style={{width:60,textAlign:'center'}}
+          value={q.marks||1} onChange={e=>upd({marks:parseInt(e.target.value)||1})}/>
+        <span style={{fontSize:11,color:'#6b7299'}}>
+          Correct: <strong>{q.correctAnswer ? labels[q.correctAnswer] : '—'}</strong>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/* CQ Form */
+function CQForm({q}) {
+  const {dispatch} = useApp();
+  const upd = p => dispatch({type:'UPD_Q',id:q.id,p});
+  const subs = [
+    {key:'subA',bn:'ক) জ্ঞানমূলক',en:'Knowledge (1 mark)',marks:1,bg:'#fef3c7'},
+    {key:'subB',bn:'খ) অনুধাবনমূলক',en:'Comprehension (2 marks)',marks:2,bg:'#ede9fe'},
+    {key:'subC',bn:'গ) প্রয়োগমূলক',en:'Application (3 marks)',marks:3,bg:'#dcfce7'},
+    {key:'subD',bn:'ঘ) উচ্চতর দক্ষতামূলক',en:'Higher-order (4 marks)',marks:4,bg:'#fee2e2'},
+  ];
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:12}}>
+      <div>
+        <label className="label">উদ্দীপক / Stimulus</label>
+        <textarea className="textarea" rows={4} style={{background:'#fffbeb',borderColor:'#fcd34d'}}
+          placeholder="Type the stimulus/passage here..."
+          value={q.stimulus||''} onChange={e=>upd({stimulus:e.target.value})}/>
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:8,color:'#6b7299',fontSize:11}}>
+        <div style={{flex:1,height:1,background:'#e8e5de'}}/> Sub-questions <div style={{flex:1,height:1,background:'#e8e5de'}}/>
+      </div>
+      {subs.map(s=>(
+        <div key={s.key} className="cq-sub-row">
+          <div className="cq-mark-chip">{s.marks}</div>
+          <div style={{flex:1}}>
+            <label className="label" style={{color:'#6d28d9',fontFamily:"'Hind Siliguri',sans-serif"}}>
+              {s.bn} <span style={{fontWeight:400,color:'#9ca3af'}}>({s.en})</span>
+            </label>
+            <textarea className="textarea" rows={2}
+              placeholder={`${s.bn}...`}
+              value={q[s.key]||''} onChange={e=>upd({[s.key]:e.target.value})}/>
+          </div>
+        </div>
+      ))}
+      <div style={{background:'#f5f3ff',border:'1px solid #ddd6fe',borderRadius:8,padding:'8px 12px',fontSize:12,color:'#6d28d9'}}>
+        Total: <strong>10 marks</strong> (1+2+3+4) — SSC/HSC standard CQ format
+      </div>
+    </div>
+  );
+}
+
+/* SQ Form */
+function SQForm({q}) {
+  const {dispatch} = useApp();
+  const upd = p => dispatch({type:'UPD_Q',id:q.id,p});
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:10}}>
+      <div>
+        <label className="label">Question (প্রশ্ন)</label>
+        <textarea className="textarea" rows={4}
+          placeholder="Type short question... $math$ supported"
+          value={q.stem||''} onChange={e=>upd({stem:e.target.value})}/>
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:10}}>
+        <label className="label" style={{margin:0,whiteSpace:'nowrap'}}>Marks (নম্বর):</label>
+        <input type="number" min={1} max={20} className="input" style={{width:60,textAlign:'center'}}
+          value={q.marks||5} onChange={e=>upd({marks:parseInt(e.target.value)||5})}/>
+      </div>
+    </div>
+  );
+}
+
+/* Question Card */
+function QuestionCard({q, index, onDragStart, onDragEnter, onDragEnd}) {
+  const {state,dispatch} = useApp();
+  const [open,setOpen] = useState(true);
+  const isActive = state.ui.activeQId === q.id;
+  const meta = {
+    mcq:{label:'MCQ',badge:'badge-mcq',cls:'mcq-card'},
+    cq: {label:'সৃজনশীল',badge:'badge-cq',cls:'cq-card'},
+    sq: {label:'Short Q',badge:'badge-sq',cls:'sq-card'},
+  }[q.type] || {label:'Q',badge:'badge-sq',cls:'sq-card'};
+
+  const preview = (q.stem||q.stimulus||'').slice(0,70);
+
+  return (
+    <div
+      className={`q-card ${meta.cls} ${isActive?'active':''}`}
+      draggable onDragStart={onDragStart} onDragEnter={onDragEnter} onDragEnd={onDragEnd}
+      onDragOver={e=>e.preventDefault()}
+      onClick={()=>dispatch({type:'SET_ACTIVE',p:q.id})}
+    >
+      <div className="q-card-head">
+        <span className="drag-handle" title="Drag to reorder">⠿</span>
+        <span className="q-num">{index+1}</span>
+        <span className={`badge ${meta.badge}`}>{meta.label}</span>
+        <span className="q-preview">{preview||'(empty)'}{preview.length>=70?'…':''}</span>
+        {q.type!=='cq' && <span style={{fontSize:11,color:'#9ca3af',flexShrink:0}}>{q.marks}pts</span>}
+        {q.type==='cq' && <span style={{fontSize:11,color:'#9ca3af',flexShrink:0}}>10pts</span>}
+        <button className="btn btn-ghost btn-sm" style={{padding:'3px 6px'}}
+          onClick={e=>{e.stopPropagation();setOpen(o=>!o)}}>{open?'▲':'▼'}</button>
+        <button className="btn btn-danger btn-sm" style={{padding:'3px 6px'}}
+          onClick={e=>{e.stopPropagation();dispatch({type:'DEL_Q',id:q.id})}}>🗑</button>
+      </div>
+      {open && (
+        <div className="q-card-body">
+          {q.type==='mcq' && <MCQForm q={q}/>}
+          {q.type==='cq'  && <CQForm  q={q}/>}
+          {q.type==='sq'  && <SQForm  q={q}/>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* Question List */
+function QuestionList() {
+  const {state,dispatch} = useApp();
+  const {questions} = state;
+  const dragIdx = useRef(null), dragOver = useRef(null);
+
+  const add = type => dispatch({type:'ADD_Q',p:type});
+
+  const reorder = () => {
+    if (dragIdx.current===null||dragOver.current===null) return;
+    const qs = [...questions];
+    const [moved] = qs.splice(dragIdx.current,1);
+    qs.splice(dragOver.current,0,moved);
+    dispatch({type:'REORDER',p:qs});
+    dragIdx.current=null; dragOver.current=null;
+  };
+
+  return (
+    <div>
+      <div className="add-btns">
+        <button className="btn btn-secondary" style={{color:'#1d4ed8',borderColor:'#bfdbfe'}} onClick={()=>add('mcq')}>
+          📝 + MCQ
+        </button>
+        <button className="btn btn-secondary bn" style={{color:'#6d28d9',borderColor:'#ddd6fe'}} onClick={()=>add('cq')}>
+          📚 + সৃজনশীল (CQ)
+        </button>
+        <button className="btn btn-secondary" style={{color:'#0f766e',borderColor:'#99f6e4'}} onClick={()=>add('sq')}>
+          ✏️ + Short Q
+        </button>
+      </div>
+
+      {questions.length===0 && (
+        <div className="card" style={{padding:40,textAlign:'center'}}>
+          <div style={{fontSize:36,marginBottom:12}}>📋</div>
+          <p style={{fontWeight:600,color:'#1a1d2e',marginBottom:6}}>No questions yet</p>
+          <p style={{fontSize:13,color:'#6b7299',maxWidth:260,margin:'0 auto'}}>
+            Add MCQ, Creative, or Short questions above — or upload an image to auto-extract.
+          </p>
+        </div>
+      )}
+
+      {questions.map((q,i)=>(
+        <QuestionCard key={q.id} q={q} index={i}
+          onDragStart={()=>{dragIdx.current=i}}
+          onDragEnter={()=>{dragOver.current=i}}
+          onDragEnd={reorder}
+        />
+      ))}
+    </div>
+  );
+}
+
+/* Image Upload & Gemini Extraction */
+function ImageUpload() {
+  const {state,dispatch} = useApp();
+  const [file,setFile]   = useState(null);
+  const [prev,setPrev]   = useState(null);
+  const [loading,setLoad]= useState(false);
+  const [err,setErr]     = useState('');
+  const [result,setRes]  = useState(null);
+  const [drag,setDrag]   = useState(false);
+  const inputRef = useRef();
+
+  const pick = files => {
+    const f = files[0]; if(!f) return;
+    setFile(f); setErr(''); setRes(null);
+    setPrev(URL.createObjectURL(f));
+  };
+  const onDrop  = e => { e.preventDefault(); setDrag(false); pick(e.dataTransfer.files); };
+  const onInput = e => pick(e.target.files);
+
+  const extract = async () => {
+    setLoad(true); setErr('');
+    try {
+      const qs = await parseWithGemini(file, state.settings.geminiApiKey);
+      setRes(qs);
+    } catch(e){ setErr(e.message); }
+    finally{ setLoad(false); }
+  };
+
+  const importAll = () => {
+    if (!result?.length) return;
+    dispatch({type:'IMPORT_QS',p:result});
+    dispatch({type:'NOTIFY',p:{type:'success',message:`${result.length} question(s) imported!`}});
+    clear();
+  };
+
+  const clear = () => {
+    setFile(null); if(prev) URL.revokeObjectURL(prev);
+    setPrev(null); setRes(null); setErr('');
+  };
+
+  return (
+    <div className="card" style={{padding:18}}>
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+        <div className="section-hdr" style={{margin:0}}>AI Image Extraction</div>
+        <span className="badge badge-cq" style={{fontSize:10}}>Gemini</span>
+      </div>
+      <p style={{fontSize:12,color:'#6b7299',marginBottom:14,lineHeight:1.6}}>
+        Upload a photo/screenshot of a question paper. Gemini auto-detects and fills all fields.
+      </p>
+
+      {!file ? (
+        <div
+          className={`dropzone ${drag?'drag-over':''}`}
+          onDragOver={e=>{e.preventDefault();setDrag(true)}}
+          onDragLeave={()=>setDrag(false)}
+          onDrop={onDrop}
+          onClick={()=>inputRef.current?.click()}
+        >
+          <input ref={inputRef} type="file" accept="image/*" style={{display:'none'}} onChange={onInput}/>
+          <div className="dropzone-icon">🖼️</div>
+          <p style={{fontWeight:600,fontSize:13,color:'#1a1d2e',marginBottom:4}}>
+            {drag ? 'Drop image here' : 'Drag & drop or click to upload'}
+          </p>
+          <p style={{fontSize:11,color:'#9ca3af'}}>PNG, JPG, WEBP — max 10 MB</p>
+        </div>
+      ) : (
+        <div style={{display:'flex',flexDirection:'column',gap:10}}>
+          <div style={{position:'relative',borderRadius:10,overflow:'hidden',border:'1px solid #e8e5de'}}>
+            <img src={prev} alt="Uploaded" style={{width:'100%',maxHeight:200,objectFit:'contain',background:'#f5f3ee'}}/>
+            <button className="btn btn-ghost btn-sm"
+              style={{position:'absolute',top:6,right:6,background:'#fff',border:'1px solid #e8e5de'}}
+              onClick={clear}>✕</button>
+          </div>
+          <p style={{fontSize:11,color:'#6b7299'}}><strong>{file.name}</strong> — {(file.size/1024).toFixed(0)} KB</p>
+
+          {err && (
+            <div style={{background:'#fef2f2',border:'1px solid #fecaca',borderRadius:8,
+                         padding:'8px 12px',fontSize:12,color:'#dc2626',display:'flex',gap:8}}>
+              ⚠️ {err}
+            </div>
+          )}
+
+          {result && !err && (
+            <div style={{background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:8,
+                         padding:'10px 12px',fontSize:12,color:'#15803d'}}>
+              <div style={{fontWeight:700,marginBottom:6}}>✅ Found {result.length} question(s)</div>
+              <ul style={{listStyle:'disc',paddingLeft:16,color:'#166534'}}>
+                {result.slice(0,5).map((q,i)=>(
+                  <li key={i}>[{(q.type||'?').toUpperCase()}] {(q.stem||q.stimulus||'').slice(0,50)}</li>
+                ))}
+                {result.length>5 && <li>…and {result.length-5} more</li>}
+              </ul>
+            </div>
+          )}
+
+          <div style={{display:'flex',gap:8}}>
+            {!result && (
+              <button className="btn btn-primary" style={{flex:1}} onClick={extract} disabled={loading}>
+                {loading ? <><span className="spin">⟳</span> Extracting…</> : <>✨ Extract with Gemini</>}
+              </button>
+            )}
+            {result && (
+              <button className="btn btn-primary" style={{flex:1}} onClick={importAll}>
+                ✅ Import {result.length} Question{result.length>1?'s':''}
+              </button>
+            )}
+            <button className="btn btn-secondary" onClick={clear}>Clear</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Paper Preview ──────────────────────────────────── */
+function PaperPreview({id}) {
+  const {state} = useApp();
+  const {header:h, questions, settings} = state;
+  const BN={a:'ক',b:'খ',c:'গ',d:'ঘ'}, LA={a:'a',b:'b',c:'c',d:'d'};
+  const labels = settings.mcqOptionStyle==='bangla' ? BN : LA;
+  const showAns = settings.showCorrectAnswer;
+
+  const mcqs = questions.filter(q=>q.type==='mcq');
+  const cqs  = questions.filter(q=>q.type==='cq');
+  const sqs  = questions.filter(q=>q.type==='sq');
+  const mcqMark = mcqs.reduce((s,q)=>s+(q.marks||1),0);
+  const cqMark  = cqs.length * 10;
+  const sqMark  = sqs.reduce((s,q)=>s+(q.marks||5),0);
+
+  return (
+    <div id={id} className="preview-paper">
+      {/* Header */}
+      <div className="paper-header">
+        {h.schoolName && <h1 className="bn-serif">{h.schoolName}</h1>}
+        {h.examTitle  && <h2 className="bn-serif">{h.examTitle}</h2>}
+        <div className="exam-meta">
+          <div className="bn">
+            {h.subject && <><strong>বিষয়:</strong> {h.subject}</>}
+            {h.year ? ` | ${h.year}` : ''}
+          </div>
+          <div className="bn">
+            {h.time && <><strong>সময়:</strong> {h.time}</>}
+          </div>
+          <div className="bn">
+            {h.totalMarks && <><strong>পূর্ণমান:</strong> {h.totalMarks}</>}
+          </div>
+        </div>
+        {h.instructions && (
+          <p style={{fontSize:'10pt',marginTop:8,fontStyle:'italic',textAlign:'left'}} className="bn">
+            {h.instructions}
+          </p>
+        )}
+      </div>
+
+      {/* Empty */}
+      {questions.length===0 && (
+        <div className="preview-empty">
+          <div className="e-icon">📄</div>
+          <p style={{fontWeight:600}}>Your paper will appear here</p>
+          <p style={{fontSize:12,marginTop:4}}>Add questions in the editor on the left</p>
+        </div>
+      )}
+
+      {/* MCQ Section */}
+      {mcqs.length > 0 && <>
+        <div className="section-title bn-serif">
+          বহুনির্বাচনি প্রশ্ন / Multiple Choice Questions
+          <span style={{fontSize:'11pt',fontWeight:400,marginLeft:12}}>[{mcqMark} marks]</span>
+        </div>
+        {mcqs.map((q,i)=>(
+          <div key={q.id} className="question-block">
+            <div className="q-stem">
+              <span style={{marginRight:6}}>{i+1}.</span>
+              <MathText text={q.stem}/>
+              <span style={{fontSize:'10pt',fontWeight:400,color:'#6b7299',marginLeft:8}}>({q.marks})</span>
+            </div>
+            <div className="mcq-options">
+              {['a','b','c','d'].map(k=>(
+                <div key={k} className={`mcq-opt ${showAns&&q.correctAnswer===k?'correct-opt':''}`}>
+                  <span className="bn-serif">{labels[k]}.</span>
+                  <MathText text={q.options?.[k]||''}/>
+                  {showAns&&q.correctAnswer===k && <span style={{color:'#15803d',marginLeft:4}}>✓</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </>}
+
+      {/* CQ Section */}
+      {cqs.length > 0 && <>
+        <div className="section-title bn-serif">
+          সৃজনশীল প্রশ্ন / Creative Questions
+          <span style={{fontSize:'11pt',fontWeight:400,marginLeft:12}}>[{cqMark} marks]</span>
+        </div>
+        {cqs.map((q,i)=>(
+          <div key={q.id} className="question-block">
+            <div className="q-stem">
+              <span style={{marginRight:6}}>{i+1}.</span>
+              <span className="bn-serif">উদ্দীপক:</span>
+            </div>
+            <div className="cq-stimulus bn">
+              <MathText text={q.stimulus}/>
+            </div>
+            <div className="cq-subs bn">
+              {[
+                {key:'subA',lbl:'ক',m:1},{key:'subB',lbl:'খ',m:2},
+                {key:'subC',lbl:'গ',m:3},{key:'subD',lbl:'ঘ',m:4}
+              ].map(s=>q[s.key]?(
+                <div key={s.key} className="cq-sub-item">
+                  <span className="bn-serif" style={{fontWeight:700,minWidth:'1.5em'}}>{s.lbl})</span>
+                  <span style={{flex:1}}><MathText text={q[s.key]}/></span>
+                  <span style={{color:'#6b7299',fontSize:'10pt',marginLeft:8,flexShrink:0}}>{s.m}</span>
+                </div>
+              ):null)}
+            </div>
+          </div>
+        ))}
+      </>}
+
+      {/* SQ Section */}
+      {sqs.length > 0 && <>
+        <div className="section-title">
+          Short Questions
+          <span style={{fontSize:'11pt',fontWeight:400,marginLeft:12}}>[{sqMark} marks]</span>
+        </div>
+        {sqs.map((q,i)=>(
+          <div key={q.id} className="question-block">
+            <div className="q-stem">
+              <span style={{marginRight:6}}>{i+1}.</span>
+              <MathText text={q.stem}/>
+              <span style={{fontSize:'10pt',fontWeight:400,color:'#6b7299',marginLeft:8}}>({q.marks})</span>
+            </div>
+          </div>
+        ))}
+      </>}
+
+      {questions.length > 0 && (
+        <div className="paper-footer bn">— প্রশ্নপত্র সমাপ্ত / End of Question Paper —</div>
+      )}
+    </div>
+  );
+}
+
+/* Toolbar */
+function Toolbar() {
+  const {state,dispatch} = useApp();
+  const {questions,header} = state;
+  const {mobileTab} = state.ui;
+  const [exporting,setExp] = useState(false);
+
+  const notify = (type,message) => dispatch({type:'NOTIFY',p:{type,message}});
+
+  const handleExport = async () => {
+    if (!questions.length) { notify('warning','Add questions first.'); return; }
+    setExp(true);
+    try { await exportPDF(header); notify('success','PDF exported!'); }
+    catch(e){ notify('error',e.message); }
+    finally{ setExp(false); }
+  };
+
+  const handlePrint = () => {
+    if (!questions.length) { notify('warning','Add questions first.'); return; }
+    window.print();
+  };
+
+  const clearAll = () => {
+    if (!questions.length) return;
+    if (confirm('Clear all questions and header?')) {
+      dispatch({type:'CLEAR'}); notify('success','Paper cleared.');
+    }
+  };
+
+  return (
+    <header className="toolbar">
+      {/* Logo */}
+      <div style={{display:'flex',alignItems:'center',gap:10,marginRight:8}}>
+        <div className="logo-icon">প্র</div>
+        <div className="logo-text">
+          <p>প্রশ্নপত্র বিল্ডার</p>
+          <span>SSC / HSC Question Paper Builder</span>
+        </div>
+      </div>
+
+      {/* Mobile tab toggle */}
+      <div className="tab-bar" style={{flex:1}}>
+        <button className={`tab-btn ${mobileTab==='editor'?'active':''}`}
+          onClick={()=>dispatch({type:'MOBILE_TAB',p:'editor'})}>✏️ Edit</button>
+        <button className={`tab-btn ${mobileTab==='preview'?'active':''}`}
+          onClick={()=>dispatch({type:'MOBILE_TAB',p:'preview'})}>👁️ Preview</button>
+      </div>
+
+      <div style={{flex:1}}/>
+
+      {questions.length>0 && (
+        <span className="badge" style={{background:'#eff6ff',color:'#1d4ed8',border:'1px solid #bfdbfe',fontSize:11}}>
+          {questions.length} Q
+        </span>
+      )}
+
+      <button className="btn btn-ghost" onClick={handlePrint} title="Print" style={{padding:'6px 10px'}}>
+        🖨️ <span style={{display:'none'}}>Print</span>
+      </button>
+
+      <button className="btn btn-primary" onClick={handleExport} disabled={exporting}>
+        {exporting ? <span className="spin">⟳</span> : '⬇️'}
+        <span style={{marginLeft:4}}>{exporting?'Exporting…':'Export PDF'}</span>
+      </button>
+
+      <button className="btn btn-ghost" onClick={clearAll} title="Clear all" style={{color:'#dc2626'}}>🗑</button>
+      <button className="btn btn-ghost" onClick={()=>dispatch({type:'SETTINGS_OPEN',p:true})} title="Settings">⚙️</button>
+    </header>
+  );
+}
+
+/* ── APP ROOT ────────────────────────────────────────── */
+function App() {
+  const {state} = useApp();
+  const {mobileTab} = state.ui;
+
+  return (
+    <div>
+      <Toolbar/>
+
+      {/* Hidden PDF target */}
+      <div id="pdf-root" style={{position:'absolute',top:'-99999px',left:0,width:'794px',
+                                  visibility:'hidden',background:'#fff'}} aria-hidden="true">
+        <PaperPreview id="pdf-root-inner"/>
+      </div>
+
+      <div className="main">
+        {/* Editor col */}
+        <div className={`editor-col ${mobileTab==='preview'?'mobile-hide':''}`}>
+          <HeaderEditor/>
+          <ImageUpload/>
+          <div>
+            <div className="section-hdr">
+              Questions
+              {state.questions.length>0 && (
+                <span className="badge badge-mcq" style={{marginLeft:8}}>{state.questions.length}</span>
+              )}
+            </div>
+            <QuestionList/>
+          </div>
+        </div>
+
+        {/* Preview col */}
+        <div className={`preview-col ${mobileTab==='preview'?'mobile-show':''}`}>
+          <div className="preview-sticky">
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
+              <div className="section-hdr" style={{margin:0,flex:1}}>Live Preview</div>
+              <span style={{fontSize:11,color:'#9ca3af'}}>A4 · print ready</span>
+            </div>
+            <div className="preview-frame">
+              <PaperPreview/>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="math-hint">
+        💡 Math: <code>$x^2 + y^2 = r^2$</code> for inline &nbsp;|&nbsp; <code>$$\frac{"{"a}{"}{"}{"b}"}$$</code> for block equations
+      </div>
+
+      <SettingsModal/>
+      <Notification/>
+    </div>
+  );
+}
+
+/* ── PROVIDER + MOUNT ────────────────────────────────── */
+function Root() {
+  const [state,dispatch] = useReducer(reducer,init);
+  return (
+    <Ctx.Provider value={{state,dispatch}}>
+      <App/>
+    </Ctx.Provider>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Root/>);
+</script>
+</body>
+</html>
