@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>প্রশ্নপত্র বিল্ডার | Question Paper Builder</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Noto+Serif+Bengali:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Bengali:wght@400;500;600;700&family=Hind+Siliguri:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
@@ -93,54 +93,64 @@ body{min-height:100vh}
 /* ══ PAPER PREVIEW — Board-standard typography ══ */
 .pp{
   font-family:'Noto Serif Bengali','Hind Siliguri',serif;
-  font-size:11pt;line-height:1.85;color:#111;background:#fff;
-  padding:14mm 16mm 14mm 16mm;
+  font-size:10.5pt;line-height:1.75;color:#111;background:#fff;
+  padding:8mm 10mm 10mm 10mm;
   width:100%;
 }
 /* Header hierarchy */
-.pp-school{font-size:16pt;font-weight:700;text-align:center;font-family:'Noto Serif Bengali',serif;line-height:1.3;margin-bottom:3px}
-.pp-exam{font-size:13pt;font-weight:700;text-align:center;font-family:'Noto Serif Bengali',serif;line-height:1.3;margin-bottom:3px}
-.pp-subject{font-size:12pt;font-weight:700;text-align:center;font-family:'Noto Serif Bengali',serif;margin-bottom:6px}
+.pp-school{font-size:15pt;font-weight:700;text-align:center;font-family:'Noto Serif Bengali',serif;line-height:1.3;margin-bottom:2px}
+.pp-exam{font-size:12.5pt;font-weight:700;text-align:center;font-family:'Noto Serif Bengali',serif;line-height:1.3;margin-bottom:2px}
+.pp-subject{font-size:11.5pt;font-weight:700;text-align:center;font-family:'Noto Serif Bengali',serif;margin-bottom:4px}
 /* Meta row — fully justified */
-.pp-meta-row{display:flex;justify-content:space-between;align-items:flex-start;font-size:11pt;font-weight:500;margin-top:6px;gap:8px;font-family:'Hind Siliguri',sans-serif}
+.pp-meta-row{display:flex;justify-content:space-between;align-items:flex-start;font-size:10.5pt;font-weight:500;margin-top:4px;gap:8px;font-family:'Noto Serif Bengali','Hind Siliguri',sans-serif}
 .pp-meta-left{text-align:left;flex:1}
 .pp-meta-right{text-align:right;flex:1}
-/* Set / received row */
-.pp-meta-row2{display:flex;justify-content:space-between;font-size:11pt;font-family:'Hind Siliguri',sans-serif;margin-top:2px}
-/* Instruction */
-.pp-instruction{font-size:10pt;line-height:1.7;margin-top:6px;padding:4px 0 6px;border-bottom:1px solid #555;font-family:'Hind Siliguri',sans-serif;color:#222}
-/* Header dividers */
-.pp-hdr{border-bottom:2.5px double #111;padding-bottom:8px;margin-bottom:0}
+.pp-meta-row2{display:flex;justify-content:space-between;font-size:10.5pt;font-family:'Noto Serif Bengali','Hind Siliguri',sans-serif;margin-top:1px}
+.pp-instruction{font-size:9.5pt;line-height:1.6;margin-top:5px;padding:3px 0 5px;border-bottom:1px solid #555;font-family:'Noto Serif Bengali','Hind Siliguri',sans-serif;color:#222}
+.pp-hdr{border-bottom:2px double #111;padding-bottom:6px;margin-bottom:0}
 /* Section heading — between two rules */
-.pp-sec{font-size:12pt;font-weight:700;text-align:center;font-family:'Noto Serif Bengali',serif;
+.pp-sec{font-size:11.5pt;font-weight:700;text-align:center;font-family:'Noto Serif Bengali',serif;
   border-top:1.5px solid #333;border-bottom:1.5px solid #333;
-  padding:4px 0;margin:14px 0 10px}
-.pp-sec-sub{font-size:10pt;font-weight:400;margin-left:8px;color:#444}
-/* Two-column layout for MCQ */
-.pp-two-col{display:grid;grid-template-columns:1fr 1fr;gap:0 20px;column-rule:1px solid #ddd}
+  padding:3px 0;margin:10px 0 8px}
+.pp-sec-sub{font-size:9.5pt;font-weight:400;margin-left:8px;color:#444}
+/* TWO-COLUMN: CSS columns for natural flow, left-first */
+.pp-two-col{
+  column-count:2;
+  column-gap:14px;
+  column-rule:1px solid #ccc;
+}
 /* Question block */
-.qblock{margin-bottom:10px;page-break-inside:avoid}
-.qstem{font-size:11pt;line-height:1.8;margin-bottom:4px;display:flex;gap:4px;align-items:flex-start}
-.qstem-num{flex-shrink:0;font-weight:600;min-width:1.6em}
-.qmarks{font-size:10pt;color:#444;flex-shrink:0;align-self:flex-start;margin-left:auto;padding-left:6px}
+.qblock{
+  break-inside:avoid;
+  page-break-inside:avoid;
+  margin-bottom:8px;
+}
+.qstem{font-size:10.5pt;line-height:1.75;margin-bottom:3px;display:flex;gap:3px;align-items:flex-start}
+.qstem-num{flex-shrink:0;font-weight:600;min-width:1.5em}
+.qmarks{font-size:9.5pt;color:#444;flex-shrink:0;align-self:flex-start;margin-left:auto;padding-left:4px}
 /* MCQ options — 2 per line within column */
-.mcq-opts{display:grid;grid-template-columns:1fr 1fr;gap:1px 12px;margin-left:20px;font-size:10.5pt;margin-top:2px}
-.mcq-opt{display:flex;gap:4px;align-items:flex-start;line-height:1.7}
-/* SQ two-col */
-.sq-two-col{display:grid;grid-template-columns:1fr 1fr;gap:0 20px}
+.mcq-opts{display:grid;grid-template-columns:1fr 1fr;gap:0 8px;margin-left:18px;font-size:10pt;margin-top:1px}
+.mcq-opt{display:flex;gap:3px;align-items:flex-start;line-height:1.65}
+/* MCQ diagram */
+.mcq-diag{max-width:100%;height:auto;display:block;margin:4px auto 4px 18px;max-height:90px;object-fit:contain}
+/* SQ two-col via CSS columns */
+.sq-two-col{column-count:2;column-gap:14px;column-rule:1px solid #ccc}
 /* CQ stem */
-.cq-stim-box{margin:4px 0 6px 18px;padding:6px 10px;border-left:3px solid #888;font-style:italic;font-size:11pt;line-height:1.85}
-.cq-stim-img{max-width:100%;height:auto;display:block;margin:6px auto;max-height:120px;object-fit:contain}
-.cq-subs{margin-left:18px;font-size:11pt}
-.cq-si{display:flex;gap:6px;margin-bottom:3px;line-height:1.8;align-items:flex-start}
-.cq-si-lbl{font-weight:700;min-width:1.6em;flex-shrink:0;font-family:'Noto Serif Bengali',serif}
-.cq-si-marks{margin-left:auto;flex-shrink:0;padding-left:6px;color:#444;font-size:10pt}
+.cq-stim-box{margin:3px 0 5px 16px;padding:4px 8px;border-left:2.5px solid #888;font-style:italic;font-size:10.5pt;line-height:1.75}
+.cq-stim-img{max-width:100%;height:auto;display:block;margin:4px auto;max-height:100px;object-fit:contain}
+.cq-subs{margin-left:16px;font-size:10.5pt}
+.cq-si{display:flex;gap:5px;margin-bottom:2px;line-height:1.75;align-items:flex-start}
+.cq-si-lbl{font-weight:700;min-width:1.5em;flex-shrink:0;font-family:'Noto Serif Bengali',serif}
+.cq-si-marks{margin-left:auto;flex-shrink:0;padding-left:5px;color:#444;font-size:9.5pt}
 .correct-opt{font-weight:700;color:#15803d}
-.pp-foot{border-top:1px solid #555;margin-top:24px;padding-top:5px;font-size:9pt;color:#555;text-align:center}
+.pp-foot{border-top:1px solid #555;margin-top:18px;padding-top:4px;font-size:8.5pt;color:#555;text-align:center}
 .prev-empty{text-align:center;padding:60px 20px;color:#9ca3af}
-/* Diagram upload zone inside CQ */
-.diag-zone{border:1.5px dashed #c4b5fd;border-radius:8px;padding:12px;text-align:center;cursor:pointer;background:#faf5ff;transition:all .15s;font-size:12px;color:#6d28d9;margin-top:6px}
+/* Diagram upload zone */
+.diag-zone{border:1.5px dashed #c4b5fd;border-radius:8px;padding:10px;text-align:center;cursor:pointer;background:#faf5ff;transition:all .15s;font-size:12px;color:#6d28d9;margin-top:6px}
 .diag-zone:hover{background:#f5f3ff;border-color:#8b5cf6}
+/* Clipboard paste input box */
+.paste-box{width:100%;border:1px solid #e8e5de;border-radius:6px;padding:6px 10px;font-size:12px;color:#6b7299;background:#fafaf8;cursor:pointer;outline:none;caret-color:transparent;margin-top:8px;text-align:center;font-family:'Inter',sans-serif}
+.paste-box:focus{border-color:#9bb1fd;box-shadow:0 0 0 3px rgba(79,99,248,.12);color:#1a1d2e;background:#fff}
 
 @media(max-width:760px){
   .editor-col{width:100%}.preview-col{display:none}
@@ -148,7 +158,7 @@ body{min-height:100vh}
   .editor-col.mob-hide{display:none}
   .tabbar{display:flex}.logo-p,.logo-s{display:none}
   .main{gap:0;padding:12px 12px 80px}
-  .pp-two-col,.sq-two-col{grid-template-columns:1fr}
+  .pp-two-col,.sq-two-col{column-count:1}
 }
 @media print{
   .toolbar,.math-hint,.moverlay,.notif{display:none!important}
@@ -156,8 +166,8 @@ body{min-height:100vh}
   .editor-col{display:none!important}
   .preview-col{display:block!important}
   .prev-frame{box-shadow:none;border:none;max-height:none;overflow:visible}
-  .pp{padding:12mm 15mm}
-  .pp-two-col{column-gap:16px}
+  .pp{padding:8mm 10mm}
+  .pp-two-col{column-gap:12px}
 }
 </style>
 </head>
@@ -208,7 +218,7 @@ const MText=({t,cls=''})=><span className={cls} dangerouslySetInnerHTML={{__html
 /* ── State ── */
 const makeQ=type=>{
   const base={id:uid(),type};
-  if(type==='mcq')return{...base,stem:'',options:{a:'',b:'',c:'',d:''},correctAnswer:'',marks:1};
+  if(type==='mcq')return{...base,stem:'',options:{a:'',b:'',c:'',d:''},correctAnswer:'',marks:1,diagramImg:null};
   if(type==='cq') return{...base,stimulus:'',subA:'',subB:'',subC:'',subD:'',diagramImg:null};
   return{...base,stem:'',marks:5};
 };
@@ -410,10 +420,11 @@ function useClipboardPaste(onImage){
   return handlePaste;
 }
 
-/* Diagram mini-upload for CQ */
-function DiagramUpload({q}){
+/* ── Reusable diagram upload (used by MCQ + CQ) ── */
+function DiagramUpload({q,label='📐 Add Diagram (optional)'}){
   const{d}=useApp();
   const ref=useRef();
+  const pasteRef=useRef();
   const[dov,setDov]=useState(false);
 
   const pick=files=>{
@@ -422,30 +433,52 @@ function DiagramUpload({q}){
     r.onload=()=>d({t:'UPD_Q',id:q.id,p:{diagramImg:r.result}});
     r.readAsDataURL(f);
   };
-  const pasteHandler=useClipboardPaste(f=>pick([f]));
+
+  /* Ctrl+V on the paste-input box */
+  const onPasteBox=e=>{
+    const items=e.clipboardData?.items;
+    if(!items)return;
+    for(const item of items){
+      if(item.type.startsWith('image/')){
+        e.preventDefault();
+        pick([item.getAsFile()]);
+        break;
+      }
+    }
+  };
 
   if(q.diagramImg){
     return(
-      <div style={{marginTop:8,position:'relative'}}>
-        <img src={q.diagramImg} alt="diagram" style={{maxWidth:'100%',maxHeight:120,objectFit:'contain',borderRadius:6,border:'1px solid #e8e5de',display:'block'}}/>
-        <button className="btn btn-danger btn-sm" style={{position:'absolute',top:4,right:4,padding:'2px 6px'}}
-          onClick={()=>d({t:'UPD_Q',id:q.id,p:{diagramImg:null}})}>✕</button>
+      <div style={{marginTop:8,position:'relative',display:'inline-block',width:'100%'}}>
+        <img src={q.diagramImg} alt="diagram" style={{maxWidth:'100%',maxHeight:130,objectFit:'contain',borderRadius:6,border:'1px solid #e8e5de',display:'block'}}/>
+        <button className="btn btn-danger btn-sm" style={{position:'absolute',top:4,right:4,padding:'2px 7px'}}
+          onClick={()=>d({t:'UPD_Q',id:q.id,p:{diagramImg:null}})}>✕ Remove</button>
       </div>
     );
   }
   return(
-    <div
-      className={'diag-zone'+(dov?' dov':'')}
-      tabIndex={0}
-      onPaste={pasteHandler}
-      onDragOver={e=>{e.preventDefault();setDov(true)}}
-      onDragLeave={()=>setDov(false)}
-      onDrop={e=>{e.preventDefault();setDov(false);pick(e.dataTransfer.files)}}
-      onClick={()=>ref.current?.click()}
-      title="Click, drag-drop, or Ctrl+V to paste diagram"
-    >
-      <input ref={ref} type="file" accept="image/*" style={{display:'none'}} onChange={e=>pick(e.target.files)}/>
-      📐 Add Diagram (optional) — click, drag, or Ctrl+V to paste
+    <div>
+      <div
+        className={'diag-zone'+(dov?' dov':'')}
+        onDragOver={e=>{e.preventDefault();setDov(true)}}
+        onDragLeave={()=>setDov(false)}
+        onDrop={e=>{e.preventDefault();setDov(false);pick(e.dataTransfer.files)}}
+        onClick={()=>ref.current?.click()}
+      >
+        <input ref={ref} type="file" accept="image/*" style={{display:'none'}} onChange={e=>pick(e.target.files)}/>
+        {label}
+      </div>
+      {/* Paste box — click to focus, then Ctrl+V */}
+      <input
+        ref={pasteRef}
+        type="text"
+        className="paste-box"
+        readOnly
+        placeholder="🖼️ Click here then press Ctrl+V to paste diagram from clipboard"
+        onPaste={onPasteBox}
+        onFocus={e=>e.target.style.color='#1a1d2e'}
+        onBlur={e=>e.target.style.color='#6b7299'}
+      />
     </div>
   );
 }
@@ -459,6 +492,8 @@ function MCQForm({q}){
   return(
     <div style={{display:'flex',flexDirection:'column',gap:10}}>
       <div><label className="lbl">Question Stem</label><textarea className="ta" rows={3} placeholder="Type MCQ... use $x^2$ for math" value={q.stem||''} onChange={e=>upd({stem:e.target.value})}/></div>
+      {/* Optional diagram for MCQ */}
+      <DiagramUpload q={q} label="📐 Add Figure/Diagram to this MCQ (optional)"/>
       {['a','b','c','d'].map(k=>(
         <div key={k} className="opt-row">
           <div className="opt-lbl">{L[k]}</div>
@@ -486,7 +521,7 @@ function CQForm({q}){
       <div>
         <label className="lbl">উদ্দীপক / Stimulus</label>
         <textarea className="ta" rows={4} style={{background:'#fffbeb',borderColor:'#fcd34d'}} placeholder="Type stimulus/passage here..." value={q.stimulus||''} onChange={e=>upd({stimulus:e.target.value})}/>
-        <DiagramUpload q={q}/>
+        <DiagramUpload q={q} label="📐 Add Stimulus Diagram/Figure (optional)"/>
       </div>
       <div style={{display:'flex',alignItems:'center',gap:8,color:'#9ca3af',fontSize:11}}>
         <div style={{flex:1,height:1,background:'#e8e5de'}}/> Sub-questions <div style={{flex:1,height:1,background:'#e8e5de'}}/>
@@ -583,13 +618,11 @@ function ImgUpload(){
   const[err,setErr]=useState('');
   const[dov,setDov]=useState(false);
   const ref=useRef();
-  const zoneRef=useRef();
 
   const pick=files=>{
     const f=files&&files[0];if(!f)return;
     setFile(f);setErr('');setRes(null);setPrev(URL.createObjectURL(f));
   };
-  const pasteHandler=useClipboardPaste(f=>pick([f]));
 
   const extract=async()=>{
     setLoad(true);setErr('');
@@ -613,16 +646,35 @@ function ImgUpload(){
       </div>
       <p style={{fontSize:12,color:'#6b7299',marginBottom:14,lineHeight:1.6}}>Upload or paste (Ctrl+V) a photo of a question paper → Gemini auto-extracts all questions.</p>
       {!file?(
-        <div ref={zoneRef} className={'dropzone'+(dov?' dov':'')} tabIndex={0}
-          onPaste={pasteHandler}
-          onDragOver={e=>{e.preventDefault();setDov(true)}}
-          onDragLeave={()=>setDov(false)}
-          onDrop={e=>{e.preventDefault();setDov(false);pick(e.dataTransfer.files)}}
-          onClick={()=>ref.current&&ref.current.click()}>
-          <input ref={ref} type="file" accept="image/*" style={{display:'none'}} onChange={e=>pick(e.target.files)}/>
-          <div style={{fontSize:28,marginBottom:8}}>🖼️</div>
-          <p style={{fontWeight:600,fontSize:13,color:'#1a1d2e',marginBottom:4}}>{dov?'Drop here':'Drag & drop, click, or Ctrl+V to paste'}</p>
-          <p style={{fontSize:11,color:'#9ca3af'}}>PNG, JPG, WEBP — max 10 MB</p>
+        <div>
+          <div className={'dropzone'+(dov?' dov':'')}
+            onDragOver={e=>{e.preventDefault();setDov(true)}}
+            onDragLeave={()=>setDov(false)}
+            onDrop={e=>{e.preventDefault();setDov(false);pick(e.dataTransfer.files)}}
+            onClick={()=>ref.current&&ref.current.click()}>
+            <input ref={ref} type="file" accept="image/*" style={{display:'none'}} onChange={e=>pick(e.target.files)}/>
+            <div style={{fontSize:28,marginBottom:6}}>🖼️</div>
+            <p style={{fontWeight:600,fontSize:13,color:'#1a1d2e',marginBottom:4}}>{dov?'Drop here':'Drag & drop or click to upload'}</p>
+            <p style={{fontSize:11,color:'#9ca3af'}}>PNG, JPG, WEBP — max 10 MB</p>
+          </div>
+          {/* Paste-box — reliable Ctrl+V capture */}
+          <input
+            type="text"
+            className="paste-box"
+            readOnly
+            placeholder="📋 Or: click here then press Ctrl+V to paste image from clipboard"
+            onPaste={e=>{
+              const items=e.clipboardData?.items;
+              if(!items)return;
+              for(const item of items){
+                if(item.type.startsWith('image/')){
+                  e.preventDefault();
+                  pick([item.getAsFile()]);
+                  break;
+                }
+              }
+            }}
+          />
         </div>
       ):(
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
@@ -712,11 +764,11 @@ function Preview({forPDF}){
         <div className="prev-empty"><div style={{fontSize:36,marginBottom:10}}>📄</div><p style={{fontWeight:600}}>Your paper will appear here</p><p style={{fontSize:12,marginTop:4}}>Add questions in the editor on the left</p></div>
       )}
 
-      {/* ── MCQ Section — two-column layout ── */}
+      {/* ── MCQ Section — CSS columns, fills left first ── */}
       {mcqs.length>0&&<>
         <div className="pp-sec bn-serif">
           {tr.mcqSection}
-          <span className="pp-sec-sub">[{lang==='bn'?tr.markNum(mmk):mmk} {lang==='bn'?'নম্বর':'marks'}]</span>
+          <span className="pp-sec-sub">[{lang==='bn'?toBanglaNum(mmk):mmk} {lang==='bn'?'নম্বর':'marks'}]</span>
         </div>
         <div className="pp-two-col">
           {mcqs.map((q,i)=>(
@@ -726,6 +778,7 @@ function Preview({forPDF}){
                 <span style={{flex:1}}><MText t={q.stem}/></span>
                 <span className="qmarks">{lang==='bn'?toBanglaNum(q.marks||1):q.marks||1}</span>
               </div>
+              {q.diagramImg&&<img src={q.diagramImg} alt="figure" className="mcq-diag"/>}
               <div className="mcq-opts">
                 {['a','b','c','d'].map(k=>(
                   <div key={k} className={'mcq-opt bn'+(sa&&q.correctAnswer===k?' correct-opt':'')}>
