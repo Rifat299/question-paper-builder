@@ -23,8 +23,7 @@
 <!-- jsPDF + html2canvas -->
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<!-- Tesseract.js — in-browser OCR, no API needed -->
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.4/dist/tesseract.min.js"></script>
+
 
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -267,31 +266,26 @@ const Ctx = createContext(null);
 const useApp = () => useContext(Ctx);
 
 /* ══════════════════════════════════════════════
-   GEMINI API
+   GEMINI VISION API — 1-step direct image parsing
 ══════════════════════════════════════════════ */
-/* ── Gemini text-only endpoint (much cheaper than vision) ── */
 const GURL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
-/* ── Step 1: Tesseract OCR — runs fully in browser, free, no API ── */
-async function runOCR(file, onProgress) {
-  const worker = await Tesseract.createWorker(['ben','eng'], 1, {
-    logger: m => {
-      if (m.status === 'recognizing text' && onProgress) {
-        onProgress(Math.round(m.progress * 100));
-      }
-    }
+function fileToB64(file) {
+  return new Promise((res,rej)=>{
+    const r = new FileReader();
+    r.onload = () => res(r.result.split(',')[1]);
+    r.onerror = rej;
+    r.readAsDataURL(file);
   });
-  const { data: { text } } = await worker.recognize(file);
-  await worker.terminate();
-  return text.trim();
 }
 
-/* ── Step 2: Gemini text→JSON (text tokens only, ~10x cheaper) ── */
-async function geminiStructure(rawText, key) {
+async function geminiVision(file, key) {
   if (!key) throw new Error('No API key. Open ⚙ Settings first.');
-  const prompt = `You are an expert at parsing Bangladeshi SSC/HSC exam question papers.
-Below is raw OCR text extracted from a question paper image. It may have minor OCR errors.
-Your job: clean the text, identify all questions, and return a JSON array ONLY — no markdown fences, no explanation.
+  const b64  = await fileToB64(file);
+  const mime = file.type || 'image/jpeg';
+
+  const prompt = `You are an expert at reading Bangladeshi SSC/HSC exam question papers.
+Analyze this image carefully and extract ALL questions. Return a JSON array ONLY — no markdown fences, no explanation.
 
 Schema:
 MCQ: {"type":"mcq","stem":"...","options":{"a":"...","b":"...","c":"...","d":"..."},"marks":1}
@@ -299,19 +293,20 @@ CQ:  {"type":"cq","stimulus":"...","subA":"...","subB":"...","subC":"...","subD"
 SQ:  {"type":"sq","stem":"...","marks":5}
 
 Rules:
-- Fix obvious OCR typos but preserve Bangla script
-- MCQ options are usually labeled ক/খ/গ/ঘ or a/b/c/d
-- CQ (সৃজনশীল) has a stimulus (উদ্দীপক) and 4 sub-questions
-- Wrap math expressions in $...$ inline or $$...$$ block
-- Return ONLY a valid JSON array, nothing else
-
-RAW OCR TEXT:
-${rawText}`;
+- Preserve Bangla script exactly as written
+- MCQ options labeled ক/খ/গ/ঘ → map to a/b/c/d
+- CQ (সৃজনশীল) has উদ্দীপক (stimulus) + 4 sub-questions (ক খ গ ঘ)
+- Wrap math in $...$ inline or $$...$$ block LaTeX
+- Return ONLY a valid JSON array, nothing else`;
 
   const body = {
-    contents:[{parts:[{text:prompt}]}],
+    contents:[{parts:[
+      {text: prompt},
+      {inline_data:{mime_type:mime, data:b64}}
+    ]}],
     generationConfig:{temperature:0.1, maxOutputTokens:4096}
   };
+
   const res = await fetch(GURL+'?key='+key, {
     method:'POST',
     headers:{'Content-Type':'application/json'},
@@ -319,24 +314,24 @@ ${rawText}`;
   });
   if (!res.ok) {
     const e = await res.json().catch(()=>({}));
-    throw new Error(e?.error?.message || 'Gemini API error ' + res.status);
+    throw new Error(e?.error?.message || 'Gemini error ' + res.status);
   }
   const data = await res.json();
-  const text = (data?.candidates?.[0]?.content?.parts?.[0]?.text || '')
+  const txt = (data?.candidates?.[0]?.content?.parts?.[0]?.text || '')
     .replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
   try {
-    const arr = JSON.parse(text);
-    if (!Array.isArray(arr)) throw new Error('Not an array');
+    const arr = JSON.parse(txt);
+    if (!Array.isArray(arr)) throw new Error('Expected array');
     return arr;
   } catch(e) {
-    throw new Error('Gemini could not parse structure. Try editing the OCR text manually.');
+    throw new Error('Gemini returned invalid JSON. Try a clearer image.');
   }
 }
 
 async function geminiTest(key) {
   const body = {contents:[{parts:[{text:'Reply with: OK'}]}],generationConfig:{maxOutputTokens:5}};
-  const res = await fetch(GURL+'?key='+key, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  if (!res.ok) { const e=await res.json().catch(()=>({})); throw new Error(e?.error?.message||'Status '+res.status); }
+  const res = await fetch(GURL+'?key='+key,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if (!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||'Status '+res.status);}
   return true;
 }
 
@@ -708,50 +703,32 @@ function QList() {
   );
 }
 
-/* Image upload — 3-stage pipeline: OCR → Review → Gemini structure */
+/* Image upload — clean 1-step Gemini vision */
 function ImgUpload() {
   const {s,d} = useApp();
-  const [file,setFile]     = useState(null);
-  const [prev,setPrev]     = useState(null);
-  const [dov,setDov]       = useState(false);
-  const [stage,setStage]   = useState('idle'); // idle|ocr|review|structuring|done
-  const [ocrPct,setOcrPct] = useState(0);
-  const [rawText,setRaw]   = useState('');
-  const [result,setRes]    = useState(null);
-  const [err,setErr]       = useState('');
+  const [file,setFile]   = useState(null);
+  const [prev,setPrev]   = useState(null);
+  const [loading,setLoad]= useState(false);
+  const [result,setRes]  = useState(null);
+  const [err,setErr]     = useState('');
+  const [dov,setDov]     = useState(false);
   const ref = useRef();
 
   const pick = files => {
     const f = files&&files[0]; if(!f) return;
-    setFile(f); setErr(''); setRes(null); setRaw(''); setStage('idle');
+    setFile(f); setErr(''); setRes(null);
     setPrev(URL.createObjectURL(f));
   };
 
-  /* Stage 1 — Tesseract OCR */
-  const doOCR = async () => {
-    setStage('ocr'); setErr(''); setOcrPct(0);
+  const extract = async () => {
+    setLoad(true); setErr('');
     try {
-      const text = await runOCR(file, pct => setOcrPct(pct));
-      if (!text) throw new Error('OCR returned no text. Try a clearer/higher-res image.');
-      setRaw(text);
-      setStage('review');
-    } catch(e) {
-      setErr('OCR failed: ' + e.message);
-      setStage('idle');
-    }
-  };
-
-  /* Stage 2 — Gemini structures the raw text */
-  const doStructure = async () => {
-    if (!rawText.trim()) { setErr('OCR text is empty. Cannot proceed.'); return; }
-    setStage('structuring'); setErr('');
-    try {
-      const qs = await geminiStructure(rawText, s.settings.geminiApiKey);
+      const qs = await geminiVision(file, s.settings.geminiApiKey);
       setRes(qs);
-      setStage('done');
     } catch(e) {
       setErr(e.message);
-      setStage('review'); // let user edit text and retry
+    } finally {
+      setLoad(false);
     }
   };
 
@@ -763,56 +740,22 @@ function ImgUpload() {
   };
 
   const clear = () => {
-    setFile(null); if(prev)URL.revokeObjectURL(prev);
-    setPrev(null); setRes(null); setRaw(''); setErr(''); setStage('idle'); setOcrPct(0);
+    setFile(null); if(prev) URL.revokeObjectURL(prev);
+    setPrev(null); setRes(null); setErr('');
   };
-
-  /* ── Stage labels ── */
-  const stageBar = (
-    <div style={{display:'flex',alignItems:'center',gap:4,marginBottom:12,fontSize:11}}>
-      {[
-        {k:'idle',    l:'① Upload'},
-        {k:'ocr',     l:'② OCR'},
-        {k:'review',  l:'③ Review'},
-        {k:'structuring',l:'④ AI Parse'},
-        {k:'done',    l:'⑤ Import'},
-      ].map((st,i,arr)=>{
-        const stages = ['idle','ocr','review','structuring','done'];
-        const cur = stages.indexOf(stage);
-        const me  = stages.indexOf(st.k);
-        const done = cur > me;
-        const active = cur === me;
-        return (
-          <React.Fragment key={st.k}>
-            <span style={{
-              padding:'2px 7px', borderRadius:99, fontWeight:600,
-              background: done?'#dcfce7':active?'#4f63f8':'#f0ede8',
-              color: done?'#15803d':active?'#fff':'#9ca3af',
-              border: active?'1px solid #4f63f8':'1px solid transparent',
-              transition:'all .2s'
-            }}>{st.l}</span>
-            {i<arr.length-1 && <span style={{color:'#d1d5db',fontSize:9}}>▶</span>}
-          </React.Fragment>
-        );
-      })}
-    </div>
-  );
 
   return (
     <div className="card" style={{padding:18}}>
-      {/* Header */}
       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
         <div className="sec-hdr" style={{margin:0}}>AI Image Extraction</div>
-        <span className="badge" style={{background:'#f0fdf4',color:'#15803d',border:'1px solid #bbf7d0',fontSize:10}}>OCR + Gemini</span>
+        <span className="badge badge-mcq" style={{fontSize:10}}>Gemini 2.5 Flash</span>
       </div>
-      <p style={{fontSize:12,color:'#6b7299',marginBottom:12,lineHeight:1.6}}>
-        2-step pipeline: <strong>Tesseract OCR</strong> (free, offline) extracts text → <strong>Gemini</strong> maps structure. Uses ~10× fewer tokens.
+      <p style={{fontSize:12,color:'#6b7299',marginBottom:14,lineHeight:1.6}}>
+        Upload a photo of a question paper → Gemini reads and auto-fills all questions instantly.
       </p>
 
-      {stageBar}
-
       {/* Drop zone */}
-      {stage==='idle' && !file && (
+      {!file && (
         <div className={'dropzone'+(dov?' dov':'')}
           onDragOver={e=>{e.preventDefault();setDov(true)}}
           onDragLeave={()=>setDov(false)}
@@ -820,98 +763,88 @@ function ImgUpload() {
           onClick={()=>ref.current&&ref.current.click()}>
           <input ref={ref} type="file" accept="image/*" style={{display:'none'}} onChange={e=>pick(e.target.files)}/>
           <div style={{fontSize:28,marginBottom:8}}>🖼️</div>
-          <p style={{fontWeight:600,fontSize:13,color:'#1a1d2e',marginBottom:4}}>{dov?'Drop here':'Drag & drop or click to upload'}</p>
+          <p style={{fontWeight:600,fontSize:13,color:'#1a1d2e',marginBottom:4}}>
+            {dov?'Drop image here':'Drag & drop or click to upload'}
+          </p>
           <p style={{fontSize:11,color:'#9ca3af'}}>PNG, JPG, WEBP — max 10 MB</p>
         </div>
       )}
 
-      {/* Image preview + OCR button */}
-      {file && stage==='idle' && (
+      {/* File picked — show preview + actions */}
+      {file && (
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
           <div style={{position:'relative',borderRadius:10,overflow:'hidden',border:'1px solid #e8e5de'}}>
-            <img src={prev} alt="" style={{width:'100%',maxHeight:160,objectFit:'contain',background:'#f5f3ee',display:'block'}}/>
-            <button className="btn btn-ghost btn-sm" style={{position:'absolute',top:6,right:6,background:'#fff',border:'1px solid #e8e5de'}} onClick={clear}>✕</button>
+            <img src={prev} alt="Question paper" style={{width:'100%',maxHeight:200,objectFit:'contain',background:'#f5f3ee',display:'block'}}/>
+            <button className="btn btn-ghost btn-sm"
+              style={{position:'absolute',top:6,right:6,background:'#fff',border:'1px solid #e8e5de'}}
+              onClick={clear}>✕</button>
           </div>
-          <p style={{fontSize:11,color:'#6b7299'}}><strong>{file.name}</strong> — {(file.size/1024).toFixed(0)} KB</p>
-          {err && <div style={{background:'#fef2f2',border:'1px solid #fecaca',borderRadius:8,padding:'8px 12px',fontSize:12,color:'#dc2626'}}>⚠️ {err}</div>}
-          <button className="btn btn-primary" onClick={doOCR}>
-            🔍 Step 1: Extract Text (OCR)
-          </button>
-        </div>
-      )}
 
-      {/* OCR progress */}
-      {stage==='ocr' && (
-        <div style={{display:'flex',flexDirection:'column',gap:10,alignItems:'center',padding:'20px 0'}}>
-          <div style={{fontSize:24}} className="spin">⟳</div>
-          <p style={{fontWeight:600,fontSize:13,color:'#1a1d2e'}}>Running OCR on image…</p>
-          <div style={{width:'100%',background:'#f0ede8',borderRadius:99,height:8,overflow:'hidden'}}>
-            <div style={{width:ocrPct+'%',background:'#4f63f8',height:'100%',borderRadius:99,transition:'width .3s'}}/>
-          </div>
-          <p style={{fontSize:11,color:'#6b7299'}}>{ocrPct}% complete — Tesseract analyzing Bangla + English text</p>
-        </div>
-      )}
+          <p style={{fontSize:11,color:'#6b7299'}}>
+            <strong>{file.name}</strong> — {(file.size/1024).toFixed(0)} KB
+          </p>
 
-      {/* Review / edit raw OCR text */}
-      {stage==='review' && (
-        <div style={{display:'flex',flexDirection:'column',gap:10}}>
-          <div style={{background:'#fffbeb',border:'1px solid #fcd34d',borderRadius:8,padding:'8px 12px'}}>
-            <p style={{fontSize:11,fontWeight:600,color:'#92400e',marginBottom:4}}>
-              ✏️ Step 2: Review OCR Text — fix any errors before sending to Gemini
-            </p>
-            <p style={{fontSize:11,color:'#b45309'}}>
-              OCR is ~85-90% accurate for Bangla. Correct obvious mistakes for best results.
-            </p>
-          </div>
-          <textarea
-            className="ta"
-            rows={10}
-            style={{fontSize:12,background:'#fafaf8',lineHeight:1.9}}
-            value={rawText}
-            onChange={e=>setRaw(e.target.value)}
-            placeholder="OCR extracted text will appear here…"
-          />
-          <p style={{fontSize:11,color:'#9ca3af'}}>{rawText.length} characters extracted</p>
-          {err && <div style={{background:'#fef2f2',border:'1px solid #fecaca',borderRadius:8,padding:'8px 12px',fontSize:12,color:'#dc2626'}}>⚠️ {err}</div>}
+          {/* Error */}
+          {err && (
+            <div style={{background:'#fef2f2',border:'1px solid #fecaca',borderRadius:8,
+                         padding:'8px 12px',fontSize:12,color:'#dc2626',lineHeight:1.6}}>
+              ⚠️ {err}
+            </div>
+          )}
+
+          {/* Loading state */}
+          {loading && (
+            <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',
+                         background:'#f0f4ff',border:'1px solid #c7d2fe',borderRadius:8}}>
+              <span className="spin" style={{fontSize:18}}>⟳</span>
+              <div>
+                <p style={{fontWeight:600,fontSize:12,color:'#3730a3'}}>Gemini analyzing image…</p>
+                <p style={{fontSize:11,color:'#6366f1'}}>Reading Bangla text, detecting question types</p>
+              </div>
+            </div>
+          )}
+
+          {/* Results */}
+          {result && !loading && (
+            <div style={{background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:8,
+                         padding:'10px 12px',fontSize:12,color:'#15803d'}}>
+              <div style={{fontWeight:700,marginBottom:5}}>✅ Found {result.length} question(s)</div>
+              <ul style={{listStyle:'disc',paddingLeft:16,color:'#166534'}}>
+                {result.slice(0,5).map((q,i)=>(
+                  <li key={i}>[{(q.type||'?').toUpperCase()}] {(q.stem||q.stimulus||'').slice(0,50)}</li>
+                ))}
+                {result.length>5 && <li>…and {result.length-5} more</li>}
+              </ul>
+            </div>
+          )}
+
+          {/* Action buttons */}
           <div style={{display:'flex',gap:8}}>
-            <button className="btn btn-primary" style={{flex:1}} onClick={doStructure}>
-              ✨ Step 3: Parse with Gemini (text only)
-            </button>
+            {!result && (
+              <button className="btn btn-primary" style={{flex:1}}
+                onClick={extract} disabled={loading}>
+                {loading
+                  ? <><span className="spin">⟳</span> Analyzing…</>
+                  : <>✨ Extract with Gemini</>}
+              </button>
+            )}
+            {result && (
+              <button className="btn btn-primary" style={{flex:1}} onClick={importAll}>
+                ✅ Import {result.length} Question{result.length>1?'s':''}
+              </button>
+            )}
+            {result && (
+              <button className="btn btn-secondary" onClick={()=>{setRes(null);setErr('');}}>
+                ↩ Re-extract
+              </button>
+            )}
             <button className="btn btn-secondary" onClick={clear}>Clear</button>
           </div>
-        </div>
-      )}
 
-      {/* Gemini structuring */}
-      {stage==='structuring' && (
-        <div style={{display:'flex',flexDirection:'column',gap:10,alignItems:'center',padding:'20px 0'}}>
-          <div style={{fontSize:24}} className="spin">⟳</div>
-          <p style={{fontWeight:600,fontSize:13,color:'#1a1d2e'}}>Gemini parsing structure…</p>
-          <p style={{fontSize:11,color:'#6b7299',textAlign:'center'}}>
-            Sending text only (no image) → ~10× fewer tokens used
+          {/* Quota reminder */}
+          <p style={{fontSize:10,color:'#9ca3af',textAlign:'center'}}>
+            Free tier: 250 images/day · 10 req/min · gemini-2.5-flash
           </p>
-        </div>
-      )}
-
-      {/* Done — show results */}
-      {stage==='done' && result && (
-        <div style={{display:'flex',flexDirection:'column',gap:10}}>
-          <div style={{background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:8,padding:'10px 12px',fontSize:12,color:'#15803d'}}>
-            <div style={{fontWeight:700,marginBottom:5}}>✅ Found {result.length} question(s)</div>
-            <ul style={{listStyle:'disc',paddingLeft:16,color:'#166534'}}>
-              {result.slice(0,5).map((q,i)=>(
-                <li key={i}>[{(q.type||'?').toUpperCase()}] {(q.stem||q.stimulus||'').slice(0,50)}</li>
-              ))}
-              {result.length>5&&<li>…and {result.length-5} more</li>}
-            </ul>
-          </div>
-          <div style={{display:'flex',gap:8}}>
-            <button className="btn btn-primary" style={{flex:1}} onClick={importAll}>
-              ✅ Import {result.length} Question{result.length>1?'s':''}
-            </button>
-            <button className="btn btn-secondary" onClick={()=>setStage('review')}>← Edit Text</button>
-            <button className="btn btn-ghost" onClick={clear}>Clear</button>
-          </div>
         </div>
       )}
     </div>
