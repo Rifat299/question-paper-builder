@@ -1,590 +1,492 @@
 <!DOCTYPE html>
 <html lang="bn">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>প্রশ্নপত্র বিল্ডার | Question Paper Builder</title>
-
-<!-- Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Noto+Serif+Bengali:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-
-<!-- KaTeX -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-
-<!-- React 18 (jsDelivr — more stable than unpkg) -->
 <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
-
-<!-- Babel Standalone — pinned version, with data-presets on script tags -->
 <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.23.9/babel.min.js"></script>
-
-<!-- jsPDF + html2canvas -->
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-
-
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html{font-family:'Inter','Hind Siliguri',sans-serif;-webkit-font-smoothing:antialiased;background:#f5f3ee}
 body{min-height:100vh}
-::-webkit-scrollbar{width:6px;height:6px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:#d1d5db;border-radius:3px}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#d1d5db;border-radius:3px}
 .bn{font-family:'Hind Siliguri','Noto Serif Bengali',sans-serif;line-height:1.85}
 .bn-serif{font-family:'Noto Serif Bengali',serif;line-height:1.9}
 
 /* Buttons */
-.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s;white-space:nowrap;text-decoration:none}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s;white-space:nowrap}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .btn-primary{background:#4f63f8;color:#fff}.btn-primary:hover:not(:disabled){background:#3543ed}
 .btn-secondary{background:#fff;color:#1a1d2e;border:1px solid #e8e5de}.btn-secondary:hover{background:#f5f3ee}
 .btn-ghost{background:transparent;color:#6b7299;padding:6px 10px}.btn-ghost:hover{background:#f5f3ee}
 .btn-danger{background:transparent;color:#dc2626;padding:6px 10px}.btn-danger:hover{background:#fef2f2}
 .btn-sm{padding:5px 10px;font-size:12px;border-radius:6px}
-
-/* Card */
 .card{background:#fff;border-radius:12px;border:1px solid #e8e5de;box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 16px rgba(0,0,0,.05)}
-
-/* Inputs */
 .inp{width:100%;padding:8px 12px;border:1px solid #e8e5de;border-radius:8px;font-size:13px;color:#1a1d2e;background:#fff;outline:none;transition:border .15s,box-shadow .15s;font-family:'Hind Siliguri','Inter',sans-serif}
 .inp:focus{border-color:#9bb1fd;box-shadow:0 0 0 3px rgba(79,99,248,.12)}
 .ta{width:100%;padding:8px 12px;border:1px solid #e8e5de;border-radius:8px;font-size:13px;color:#1a1d2e;background:#fff;outline:none;resize:none;transition:border .15s,box-shadow .15s;font-family:'Hind Siliguri','Inter',sans-serif;line-height:1.8}
 .ta:focus{border-color:#9bb1fd;box-shadow:0 0 0 3px rgba(79,99,248,.12)}
 .lbl{display:block;font-size:11px;font-weight:600;color:#6b7299;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}
-
-/* Badge */
 .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600}
 .badge-mcq{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
 .badge-cq{background:#f5f3ff;color:#6d28d9;border:1px solid #ddd6fe;font-family:'Hind Siliguri',sans-serif}
 .badge-sq{background:#f0fdfa;color:#0f766e;border:1px solid #99f6e4}
 
 /* Layout */
-.toolbar{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.88);backdrop-filter:blur(12px);border-bottom:1px solid #e8e5de;height:56px;display:flex;align-items:center;padding:0 20px;gap:10px}
+.toolbar{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.88);backdrop-filter:blur(12px);border-bottom:1px solid #e8e5de;height:56px;display:flex;align-items:center;padding:0 16px;gap:8px}
 .logo-icon{width:34px;height:34px;border-radius:10px;background:#4f63f8;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;font-weight:900;font-family:'Noto Serif Bengali',serif;flex-shrink:0}
 .logo-p{font-size:13px;font-weight:700;color:#1a1d2e;line-height:1;font-family:'Hind Siliguri',sans-serif}
 .logo-s{font-size:11px;color:#6b7299;line-height:1;margin-top:2px}
-.main{display:flex;gap:24px;max-width:1280px;margin:0 auto;padding:24px 20px 80px}
-.editor-col{width:480px;flex-shrink:0;display:flex;flex-direction:column;gap:18px}
+.main{display:flex;gap:24px;max-width:1300px;margin:0 auto;padding:24px 20px 80px}
+.editor-col{width:490px;flex-shrink:0;display:flex;flex-direction:column;gap:18px}
 .preview-col{flex:1;min-width:0}
 .preview-sticky{position:sticky;top:68px}
 .sec-hdr{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;color:#3d4166;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px}
 .sec-hdr::before{content:'';display:inline-block;width:4px;height:16px;background:#4f63f8;border-radius:2px;flex-shrink:0}
-
-/* Question card */
 .qcard{background:#fff;border-radius:12px;border:1px solid #e8e5de;border-left-width:4px;box-shadow:0 1px 3px rgba(0,0,0,.05);transition:box-shadow .15s;margin-bottom:12px;cursor:pointer}
 .qcard.active{outline:2px solid #9bb1fd;box-shadow:0 2px 12px rgba(79,99,248,.15)}
 .qcard:hover{box-shadow:0 4px 16px rgba(0,0,0,.09)}
-.qcard.mc{border-left-color:#3b82f6}
-.qcard.cq{border-left-color:#8b5cf6}
-.qcard.sq{border-left-color:#14b8a6}
+.qcard.mc{border-left-color:#3b82f6}.qcard.cq{border-left-color:#8b5cf6}.qcard.sq{border-left-color:#14b8a6}
 .qcard-head{display:flex;align-items:center;gap:8px;padding:11px 14px}
 .qcard-body{border-top:1px solid #f0ede8;padding:14px}
 .qnum{width:22px;height:22px;border-radius:50%;background:#1a1d2e;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .qprev{font-size:12px;color:#6b7299;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;font-family:'Hind Siliguri',sans-serif}
-
-/* Drop zone */
-.dropzone{border:2px dashed #e8e5de;border-radius:12px;padding:28px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+.dropzone{border:2px dashed #e8e5de;border-radius:12px;padding:24px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
 .dropzone:hover,.dropzone.dov{border-color:#9bb1fd;background:#f0f4ff}
-
-/* Notification */
 .notif{position:fixed;bottom:52px;left:50%;transform:translateX(-50%);background:#fff;border:1px solid #e8e5de;box-shadow:0 8px 32px rgba(0,0,0,.12);border-radius:12px;padding:11px 16px;display:flex;align-items:center;gap:10px;min-width:260px;max-width:380px;z-index:9999;animation:sup .25s ease-out}
 @keyframes sup{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
-
-/* Modal */
 .moverlay{position:fixed;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px}
-.modal{background:#fff;border-radius:16px;box-shadow:0 16px 48px rgba(0,0,0,.2);width:100%;max-width:500px;overflow:hidden}
+.modal{background:#fff;border-radius:16px;box-shadow:0 16px 48px rgba(0,0,0,.2);width:100%;max-width:520px;overflow:hidden;max-height:90vh;overflow-y:auto}
 .mhead{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid #e8e5de}
 .mbody{padding:22px;display:flex;flex-direction:column;gap:18px}
 .mfoot{display:flex;justify-content:flex-end;gap:10px;padding:14px 22px;border-top:1px solid #e8e5de}
-
-/* Math hint bar */
 .math-hint{position:fixed;bottom:0;left:0;right:0;background:#1a1d2e;color:rgba(255,255,255,.72);font-size:11px;padding:5px 12px;text-align:center;pointer-events:none;z-index:30}
 .math-hint code{background:rgba(255,255,255,.15);padding:1px 5px;border-radius:4px;font-size:10px}
-
-/* Option row */
 .opt-row{display:flex;align-items:center;gap:8px;margin-bottom:7px}
 .opt-lbl{width:28px;height:28px;border-radius:50%;background:#eff6ff;border:1px solid #bfdbfe;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#1d4ed8;flex-shrink:0;font-family:'Hind Siliguri',sans-serif}
 .cq-row{display:flex;gap:10px;align-items:flex-start;margin-bottom:10px}
 .cq-chip{width:24px;height:24px;border-radius:50%;background:#f5f3ff;border:1px solid #ddd6fe;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#6d28d9;flex-shrink:0;margin-top:20px}
-
-/* Add buttons */
 .add-btns{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
-
-/* Preview frame */
 .prev-frame{background:#fff;border-radius:12px;border:1px solid #e8e5de;box-shadow:0 4px 24px rgba(0,0,0,.08);overflow-y:auto;max-height:calc(100vh - 128px)}
-
-/* Toggle switch */
 .tog{position:relative;width:40px;height:20px;border-radius:10px;background:#e5e7eb;cursor:pointer;transition:background .2s;flex-shrink:0;border:none;padding:0}
 .tog.on{background:#4f63f8}
 .tog-dot{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .2s;pointer-events:none}
 .tog.on .tog-dot{transform:translateX(20px)}
-
-/* Tab bar (mobile) */
 .tabbar{display:none;gap:4px;background:#f5f3ee;border:1px solid #e8e5de;border-radius:10px;padding:4px}
 .tabbtn{flex:1;padding:7px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;border:none;background:transparent;color:#6b7299;transition:all .15s}
 .tabbtn.on{background:#fff;color:#1a1d2e;box-shadow:0 1px 4px rgba(0,0,0,.1)}
-
-/* Spinner */
+/* lang toggle */
+.lang-tog{display:flex;align-items:center;background:#f5f3ee;border:1px solid #e8e5de;border-radius:8px;padding:3px;gap:2px}
+.lang-btn{padding:3px 10px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:none;background:transparent;color:#6b7299;transition:all .15s;font-family:'Hind Siliguri',sans-serif}
+.lang-btn.on{background:#fff;color:#1a1d2e;box-shadow:0 1px 3px rgba(0,0,0,.1)}
 @keyframes spin{to{transform:rotate(360deg)}}
 .spin{animation:spin 1s linear infinite;display:inline-block}
 
-/* ── Preview / PDF print styles ── */
-.pp{font-family:'Noto Serif Bengali','Hind Siliguri',serif;font-size:12pt;line-height:1.9;color:#111;background:#fff;padding:28px 32px}
-.pp-hdr{text-align:center;border-bottom:2.5px solid #111;padding-bottom:12px;margin-bottom:18px}
-.pp-hdr h1{font-size:17pt;font-weight:700;font-family:'Noto Serif Bengali',serif}
-.pp-hdr h2{font-size:13pt;font-weight:600;margin-top:4px;font-family:'Noto Serif Bengali',serif}
-.pp-meta{display:flex;justify-content:space-between;font-size:10pt;margin-top:8px}
-.pp-meta div{flex:1}
-.pp-meta div:nth-child(2){text-align:center}
-.pp-meta div:nth-child(3){text-align:right}
-.sec-title{font-size:13pt;font-weight:700;border-bottom:1px solid #333;padding-bottom:3px;margin:18px 0 10px;font-family:'Noto Serif Bengali',serif}
-.qblock{margin-bottom:14px;page-break-inside:avoid}
-.qstem{font-weight:600;margin-bottom:5px}
-.mcq-opts{display:grid;grid-template-columns:1fr 1fr;gap:3px 20px;margin-left:22px;font-size:11pt}
-.mcq-opt{display:flex;gap:5px;align-items:flex-start}
-.cq-stim{margin-left:20px;font-style:italic;border-left:3px solid #999;padding-left:10px;margin-bottom:8px;font-size:11pt}
-.cq-subs{margin-left:20px;font-size:11pt}
-.cq-si{display:flex;gap:8px;margin-bottom:3px}
-.pp-foot{border-top:1px solid #555;margin-top:32px;padding-top:6px;font-size:9pt;color:#555;text-align:center}
+/* ══ PAPER PREVIEW — Board-standard typography ══ */
+.pp{
+  font-family:'Noto Serif Bengali','Hind Siliguri',serif;
+  font-size:11pt;line-height:1.85;color:#111;background:#fff;
+  padding:14mm 16mm 14mm 16mm;
+  width:100%;
+}
+/* Header hierarchy */
+.pp-school{font-size:16pt;font-weight:700;text-align:center;font-family:'Noto Serif Bengali',serif;line-height:1.3;margin-bottom:3px}
+.pp-exam{font-size:13pt;font-weight:700;text-align:center;font-family:'Noto Serif Bengali',serif;line-height:1.3;margin-bottom:3px}
+.pp-subject{font-size:12pt;font-weight:700;text-align:center;font-family:'Noto Serif Bengali',serif;margin-bottom:6px}
+/* Meta row — fully justified */
+.pp-meta-row{display:flex;justify-content:space-between;align-items:flex-start;font-size:11pt;font-weight:500;margin-top:6px;gap:8px;font-family:'Hind Siliguri',sans-serif}
+.pp-meta-left{text-align:left;flex:1}
+.pp-meta-right{text-align:right;flex:1}
+/* Set / received row */
+.pp-meta-row2{display:flex;justify-content:space-between;font-size:11pt;font-family:'Hind Siliguri',sans-serif;margin-top:2px}
+/* Instruction */
+.pp-instruction{font-size:10pt;line-height:1.7;margin-top:6px;padding:4px 0 6px;border-bottom:1px solid #555;font-family:'Hind Siliguri',sans-serif;color:#222}
+/* Header dividers */
+.pp-hdr{border-bottom:2.5px double #111;padding-bottom:8px;margin-bottom:0}
+/* Section heading — between two rules */
+.pp-sec{font-size:12pt;font-weight:700;text-align:center;font-family:'Noto Serif Bengali',serif;
+  border-top:1.5px solid #333;border-bottom:1.5px solid #333;
+  padding:4px 0;margin:14px 0 10px}
+.pp-sec-sub{font-size:10pt;font-weight:400;margin-left:8px;color:#444}
+/* Two-column layout for MCQ */
+.pp-two-col{display:grid;grid-template-columns:1fr 1fr;gap:0 20px;column-rule:1px solid #ddd}
+/* Question block */
+.qblock{margin-bottom:10px;page-break-inside:avoid}
+.qstem{font-size:11pt;line-height:1.8;margin-bottom:4px;display:flex;gap:4px;align-items:flex-start}
+.qstem-num{flex-shrink:0;font-weight:600;min-width:1.6em}
+.qmarks{font-size:10pt;color:#444;flex-shrink:0;align-self:flex-start;margin-left:auto;padding-left:6px}
+/* MCQ options — 2 per line within column */
+.mcq-opts{display:grid;grid-template-columns:1fr 1fr;gap:1px 12px;margin-left:20px;font-size:10.5pt;margin-top:2px}
+.mcq-opt{display:flex;gap:4px;align-items:flex-start;line-height:1.7}
+/* SQ two-col */
+.sq-two-col{display:grid;grid-template-columns:1fr 1fr;gap:0 20px}
+/* CQ stem */
+.cq-stim-box{margin:4px 0 6px 18px;padding:6px 10px;border-left:3px solid #888;font-style:italic;font-size:11pt;line-height:1.85}
+.cq-stim-img{max-width:100%;height:auto;display:block;margin:6px auto;max-height:120px;object-fit:contain}
+.cq-subs{margin-left:18px;font-size:11pt}
+.cq-si{display:flex;gap:6px;margin-bottom:3px;line-height:1.8;align-items:flex-start}
+.cq-si-lbl{font-weight:700;min-width:1.6em;flex-shrink:0;font-family:'Noto Serif Bengali',serif}
+.cq-si-marks{margin-left:auto;flex-shrink:0;padding-left:6px;color:#444;font-size:10pt}
 .correct-opt{font-weight:700;color:#15803d}
+.pp-foot{border-top:1px solid #555;margin-top:24px;padding-top:5px;font-size:9pt;color:#555;text-align:center}
 .prev-empty{text-align:center;padding:60px 20px;color:#9ca3af}
+/* Diagram upload zone inside CQ */
+.diag-zone{border:1.5px dashed #c4b5fd;border-radius:8px;padding:12px;text-align:center;cursor:pointer;background:#faf5ff;transition:all .15s;font-size:12px;color:#6d28d9;margin-top:6px}
+.diag-zone:hover{background:#f5f3ff;border-color:#8b5cf6}
 
 @media(max-width:760px){
-  .editor-col{width:100%}
-  .preview-col{display:none}
+  .editor-col{width:100%}.preview-col{display:none}
   .preview-col.mob-show{display:block;flex:none;width:100%}
   .editor-col.mob-hide{display:none}
-  .tabbar{display:flex}
-  .logo-p,.logo-s{display:none}
+  .tabbar{display:flex}.logo-p,.logo-s{display:none}
   .main{gap:0;padding:12px 12px 80px}
+  .pp-two-col,.sq-two-col{grid-template-columns:1fr}
 }
-
 @media print{
   .toolbar,.math-hint,.moverlay,.notif{display:none!important}
   .main{display:block;padding:0}
   .editor-col{display:none!important}
   .preview-col{display:block!important}
   .prev-frame{box-shadow:none;border:none;max-height:none;overflow:visible}
-  .pp{padding:10mm 15mm}
+  .pp{padding:12mm 15mm}
+  .pp-two-col{column-gap:16px}
 }
 </style>
 </head>
 <body>
-<div id="root"><div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:12px;color:#6b7299;font-family:Inter,sans-serif"><div style="font-size:32px">⏳</div><p style="font-size:14px">Loading Question Paper Builder...</p></div></div>
-
+<div id="root"><div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:12px;color:#6b7299;font-family:Inter,sans-serif"><div style="font-size:32px">⏳</div><p style="font-size:14px">Loading...</p></div></div>
 <script type="text/babel" data-presets="react">
-/* ── destructure React hooks ── */
 const {useState,useReducer,useContext,createContext,useRef,useEffect,useCallback} = React;
 
-/* ══════════════════════════════════════════════
-   HELPERS
-══════════════════════════════════════════════ */
-let _n = 0;
-const uid = () => 'q_' + Date.now() + '_' + (++_n);
+/* ── i18n strings ── */
+const T = {
+  bn: {
+    mcqSection:'বহুনির্বাচনি প্রশ্ন',sqSection:'সংক্ষিপ্ত প্রশ্ন',cqSection:'সৃজনশীল প্রশ্ন',
+    time:'সময়',marks:'পূর্ণমান',subject:'বিষয়',set:'সেট',received:'প্রাপ্ত নম্বর',
+    stimulus:'উদ্দীপক',foot:'— প্রশ্নপত্র সমাপ্ত —',
+    opts:{a:'ক',b:'খ',c:'গ',d:'ঘ'},
+    markNum:n=>['০','১','২','৩','৪','৫','৬','৭','৮','৯'].reduce((s,d,i)=>s.replace(new RegExp(i,'g'),d),String(n)),
+  },
+  en: {
+    mcqSection:'Multiple Choice Questions',sqSection:'Short Questions',cqSection:'Creative Questions',
+    time:'Time',marks:'Total Marks',subject:'Subject',set:'Set',received:'Marks Obtained',
+    stimulus:'Stimulus',foot:'— End of Question Paper —',
+    opts:{a:'a',b:'b',c:'c',d:'d'},
+    markNum:n=>String(n),
+  }
+};
 
-function renderMath(text) {
-  if (!text) return '';
-  let out = '';
-  const bp = text.split(/(\$\$[\s\S]+?\$\$)/g);
-  for (const seg of bp) {
-    if (seg.startsWith('$$') && seg.endsWith('$$')) {
-      try { out += katex.renderToString(seg.slice(2,-2),{displayMode:true,throwOnError:false}); }
-      catch(e) { out += '<span style="color:red">[math err]</span>'; }
+/* ── Math renderer ── */
+let _n=0; const uid=()=>'q_'+Date.now()+'_'+(++_n);
+function renderMath(text){
+  if(!text)return'';let out='';
+  for(const seg of text.split(/(\$\$[\s\S]+?\$\$)/g)){
+    if(seg.startsWith('$$')&&seg.endsWith('$$')){
+      try{out+=katex.renderToString(seg.slice(2,-2),{displayMode:true,throwOnError:false});}
+      catch{out+='<span style="color:red">[err]</span>';}
     } else {
-      const ip = seg.split(/(\$[^$\n]+?\$)/g);
-      for (const p of ip) {
-        if (p.startsWith('$') && p.endsWith('$') && p.length > 2) {
-          try { out += katex.renderToString(p.slice(1,-1),{displayMode:false,throwOnError:false}); }
-          catch(e) { out += '<span style="color:red">[math err]</span>'; }
-        } else {
-          out += p.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-        }
+      for(const p of seg.split(/(\$[^$\n]+?\$)/g)){
+        if(p.startsWith('$')&&p.endsWith('$')&&p.length>2){
+          try{out+=katex.renderToString(p.slice(1,-1),{displayMode:false,throwOnError:false});}
+          catch{out+='<span style="color:red">[err]</span>';}
+        } else out+=p.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       }
     }
   }
   return out;
 }
+const MText=({t,cls=''})=><span className={cls} dangerouslySetInnerHTML={{__html:renderMath(t||'')}}/>;
 
-const MText = ({t, cls=''}) => (
-  <span className={cls} dangerouslySetInnerHTML={{__html: renderMath(t || '')}} />
-);
-
-/* ══════════════════════════════════════════════
-   STATE
-══════════════════════════════════════════════ */
-const makeQ = (type) => {
-  const base = {id:uid(),type};
-  if (type==='mcq') return {...base, stem:'', options:{a:'',b:'',c:'',d:''}, correctAnswer:'', marks:1};
-  if (type==='cq')  return {...base, stimulus:'', subA:'', subB:'', subC:'', subD:''};
-  return {...base, stem:'', marks:5};
+/* ── State ── */
+const makeQ=type=>{
+  const base={id:uid(),type};
+  if(type==='mcq')return{...base,stem:'',options:{a:'',b:'',c:'',d:''},correctAnswer:'',marks:1};
+  if(type==='cq') return{...base,stimulus:'',subA:'',subB:'',subC:'',subD:'',diagramImg:null};
+  return{...base,stem:'',marks:5};
 };
-
-const defHdr = {schoolName:'',examTitle:'',subject:'',time:'',totalMarks:'',year:String(new Date().getFullYear()),instructions:''};
-
-const initState = {
-  header: defHdr,
-  questions: [],
-  settings: {
-    geminiApiKey: (typeof localStorage !== 'undefined' && localStorage.getItem('qpb_key')) || '',
-    mcqStyle: (typeof localStorage !== 'undefined' && localStorage.getItem('qpb_mcq')) || 'bangla',
-    showAns: false,
+const defHdr={schoolName:'',examTitle:'',subject:'',subjectCode:'',time:'',totalMarks:'',year:String(new Date().getFullYear()),set:'',instructions:''};
+const initState={
+  header:defHdr,questions:[],
+  settings:{
+    geminiApiKey:(typeof localStorage!=='undefined'&&localStorage.getItem('qpb_key'))||'',
+    mcqStyle:(typeof localStorage!=='undefined'&&localStorage.getItem('qpb_mcq'))||'bangla',
+    showAns:false,
+    lang:'bn',
   },
-  ui: {settingsOpen:false, activeId:null, notif:null, tab:'editor'},
+  ui:{settingsOpen:false,activeId:null,notif:null,tab:'editor'},
 };
-
-function reducer(s, a) {
-  switch(a.t) {
-    case 'HDR':      return {...s, header:{...s.header,...a.p}};
-    case 'ADD_Q': {
-      const q = makeQ(a.p);
-      return {...s, questions:[...s.questions,q], ui:{...s.ui,activeId:q.id}};
-    }
-    case 'UPD_Q':    return {...s, questions:s.questions.map(q=>q.id===a.id?{...q,...a.p}:q)};
-    case 'DEL_Q':    return {...s, questions:s.questions.filter(q=>q.id!==a.id), ui:{...s.ui,activeId:s.ui.activeId===a.id?null:s.ui.activeId}};
-    case 'REORDER':  return {...s, questions:a.p};
-    case 'IMPORT': {
-      const qs = a.p.map(q=>({...makeQ(q.type||'sq'),...q,id:uid()}));
-      return {...s, questions:[...s.questions,...qs]};
-    }
-    case 'CLEAR':    return {...s, questions:[], header:defHdr};
-    case 'SETTINGS': return {...s, settings:{...s.settings,...a.p}};
+function reducer(s,a){
+  switch(a.t){
+    case 'HDR':     return{...s,header:{...s.header,...a.p}};
+    case 'ADD_Q':{const q=makeQ(a.p);return{...s,questions:[...s.questions,q],ui:{...s.ui,activeId:q.id}};}
+    case 'UPD_Q':   return{...s,questions:s.questions.map(q=>q.id===a.id?{...q,...a.p}:q)};
+    case 'DEL_Q':   return{...s,questions:s.questions.filter(q=>q.id!==a.id),ui:{...s.ui,activeId:s.ui.activeId===a.id?null:s.ui.activeId}};
+    case 'REORDER': return{...s,questions:a.p};
+    case 'IMPORT':{const qs=a.p.map(q=>({...makeQ(q.type||'sq'),...q,id:uid()}));return{...s,questions:[...s.questions,...qs]};}
+    case 'CLEAR':   return{...s,questions:[],header:defHdr};
+    case 'SETTINGS':return{...s,settings:{...s.settings,...a.p}};
     case 'SAVE_KEY':
-      try { localStorage.setItem('qpb_key',a.p); localStorage.setItem('qpb_mcq',s.settings.mcqStyle); } catch(e){}
-      return {...s, settings:{...s.settings,geminiApiKey:a.p}};
-    case 'NOTIF':    return {...s, ui:{...s.ui,notif:a.p}};
-    case 'CLRN':     return {...s, ui:{...s.ui,notif:null}};
-    case 'ACTIVE':   return {...s, ui:{...s.ui,activeId:a.p}};
-    case 'SETOPEN':  return {...s, ui:{...s.ui,settingsOpen:a.p}};
-    case 'TAB':      return {...s, ui:{...s.ui,tab:a.p}};
-    default: return s;
+      try{localStorage.setItem('qpb_key',a.p);localStorage.setItem('qpb_mcq',s.settings.mcqStyle);}catch(e){}
+      return{...s,settings:{...s.settings,geminiApiKey:a.p}};
+    case 'NOTIF':   return{...s,ui:{...s.ui,notif:a.p}};
+    case 'CLRN':    return{...s,ui:{...s.ui,notif:null}};
+    case 'ACTIVE':  return{...s,ui:{...s.ui,activeId:a.p}};
+    case 'SETOPEN': return{...s,ui:{...s.ui,settingsOpen:a.p}};
+    case 'TAB':     return{...s,ui:{...s.ui,tab:a.p}};
+    default:return s;
   }
 }
+const Ctx=createContext(null);
+const useApp=()=>useContext(Ctx);
 
-const Ctx = createContext(null);
-const useApp = () => useContext(Ctx);
-
-/* ══════════════════════════════════════════════
-   GEMINI VISION API — 1-step direct image parsing
-══════════════════════════════════════════════ */
-const GURL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
-
-function fileToB64(file) {
-  return new Promise((res,rej)=>{
-    const r = new FileReader();
-    r.onload = () => res(r.result.split(',')[1]);
-    r.onerror = rej;
-    r.readAsDataURL(file);
-  });
-}
-
-async function geminiVision(file, key) {
-  if (!key) throw new Error('No API key. Open ⚙ Settings first.');
-  const b64  = await fileToB64(file);
-  const mime = file.type || 'image/jpeg';
-
-  const prompt = `You are an expert at reading Bangladeshi SSC/HSC exam question papers.
-Analyze this image carefully and extract ALL questions. Return a JSON array ONLY — no markdown fences, no explanation.
-
+/* ── Gemini Vision ── */
+const GURL='https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+function fileToB64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});}
+async function geminiVision(file,key){
+  if(!key)throw new Error('No API key. Open ⚙ Settings first.');
+  const b64=await fileToB64(file),mime=file.type||'image/jpeg';
+  const prompt=`You are an expert at reading Bangladeshi SSC/HSC exam papers. Extract ALL questions from this image as a JSON array ONLY — no markdown fences, no explanation.
 Schema:
 MCQ: {"type":"mcq","stem":"...","options":{"a":"...","b":"...","c":"...","d":"..."},"marks":1}
 CQ:  {"type":"cq","stimulus":"...","subA":"...","subB":"...","subC":"...","subD":"..."}
 SQ:  {"type":"sq","stem":"...","marks":5}
-
-Rules:
-- Preserve Bangla script exactly as written
-- MCQ options labeled ক/খ/গ/ঘ → map to a/b/c/d
-- CQ (সৃজনশীল) has উদ্দীপক (stimulus) + 4 sub-questions (ক খ গ ঘ)
-- Wrap math in $...$ inline or $$...$$ block LaTeX
-- Return ONLY a valid JSON array, nothing else`;
-
-  const body = {
-    contents:[{parts:[
-      {text: prompt},
-      {inline_data:{mime_type:mime, data:b64}}
-    ]}],
-    generationConfig:{temperature:0.1, maxOutputTokens:4096}
-  };
-
-  const res = await fetch(GURL+'?key='+key, {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(body)
-  });
-  if (!res.ok) {
-    const e = await res.json().catch(()=>({}));
-    throw new Error(e?.error?.message || 'Gemini error ' + res.status);
-  }
-  const data = await res.json();
-  const txt = (data?.candidates?.[0]?.content?.parts?.[0]?.text || '')
-    .replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
-  try {
-    const arr = JSON.parse(txt);
-    if (!Array.isArray(arr)) throw new Error('Expected array');
-    return arr;
-  } catch(e) {
-    throw new Error('Gemini returned invalid JSON. Try a clearer image.');
-  }
+Rules: preserve Bangla script exactly. Map ক/খ/গ/ঘ options to a/b/c/d. Wrap math in $...$ or $$...$$. Return ONLY a JSON array.`;
+  const body={contents:[{parts:[{text:prompt},{inline_data:{mime_type:mime,data:b64}}]}],generationConfig:{temperature:0.1,maxOutputTokens:4096}};
+  const res=await fetch(GURL+'?key='+key,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||'Gemini error '+res.status);}
+  const data=await res.json();
+  const txt=(data?.candidates?.[0]?.content?.parts?.[0]?.text||'').replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+  try{const arr=JSON.parse(txt);if(!Array.isArray(arr))throw 0;return arr;}
+  catch{throw new Error('Gemini returned invalid JSON. Try a clearer image.');}
 }
-
-async function geminiTest(key) {
-  const body = {contents:[{parts:[{text:'Reply with: OK'}]}],generationConfig:{maxOutputTokens:5}};
-  const res = await fetch(GURL+'?key='+key,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  if (!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||'Status '+res.status);}
+async function geminiTest(key){
+  const body={contents:[{parts:[{text:'Reply: OK'}]}],generationConfig:{maxOutputTokens:5}};
+  const res=await fetch(GURL+'?key='+key,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||'Status '+res.status);}
   return true;
 }
 
-/* ══════════════════════════════════════════════
-   PDF EXPORT
-══════════════════════════════════════════════ */
-async function doExport(header) {
-  const el = document.getElementById('pdf-root');
-  if (!el) throw new Error('Preview element not found');
-  const prev = el.style.cssText;
-  el.style.cssText = 'position:fixed;top:-99999px;left:0;width:794px;background:#fff;visibility:visible;display:block;z-index:-1;';
-  try {
-    const canvas = await html2canvas(el,{scale:2,useCORS:true,backgroundColor:'#fff',width:794,logging:false});
-    const imgData = canvas.toDataURL('image/png');
-    const {jsPDF} = window.jspdf;
-    const pdf = new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
-    const W=pdf.internal.pageSize.getWidth(), H=pdf.internal.pageSize.getHeight();
-    const m=12, cw=W-m*2;
-    const scale=cw/(canvas.width/2);
-    const totalH=(canvas.height/2)*scale;
-    const usable=H-m*2;
-    if (totalH<=usable) {
-      pdf.addImage(imgData,'PNG',m,m,cw,totalH);
-    } else {
+/* ── PDF Export ── */
+async function doExport(header){
+  const el=document.getElementById('pdf-root');
+  if(!el)throw new Error('Preview not found');
+  const prev=el.style.cssText;
+  el.style.cssText='position:fixed;top:-99999px;left:0;width:794px;background:#fff;visibility:visible;display:block;z-index:-1;';
+  try{
+    const canvas=await html2canvas(el,{scale:2,useCORS:true,backgroundColor:'#fff',width:794,logging:false});
+    const imgData=canvas.toDataURL('image/png');
+    const {jsPDF}=window.jspdf;
+    const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const W=pdf.internal.pageSize.getWidth(),H=pdf.internal.pageSize.getHeight();
+    const m=10,cw=W-m*2,scale=cw/(canvas.width/2),totalH=(canvas.height/2)*scale,usable=H-m*2;
+    if(totalH<=usable){pdf.addImage(imgData,'PNG',m,m,cw,totalH);}
+    else{
       const pages=Math.ceil(totalH/usable);
-      for (let i=0;i<pages;i++) {
-        if (i>0) pdf.addPage();
+      for(let i=0;i<pages;i++){
+        if(i>0)pdf.addPage();
         pdf.addImage(imgData,'PNG',m,m-(i*usable),cw,totalH);
-        pdf.setFillColor(255,255,255);
-        pdf.rect(0,0,W,m,'F');
-        pdf.rect(0,m+usable,W,H,'F');
+        pdf.setFillColor(255,255,255);pdf.rect(0,0,W,m,'F');pdf.rect(0,m+usable,W,H,'F');
       }
     }
-    const name=((header.examTitle||'paper')+'_'+(header.subject||'exam')).replace(/\s+/g,'_')+'.pdf';
-    pdf.save(name);
-  } finally {
-    el.style.cssText = prev;
-  }
+    pdf.save(((header.examTitle||'paper')+'_'+(header.subject||'exam')).replace(/\s+/g,'_')+'.pdf');
+  }finally{el.style.cssText=prev;}
 }
 
-/* ══════════════════════════════════════════════
-   COMPONENTS
-══════════════════════════════════════════════ */
+/* ══ COMPONENTS ══ */
 
 /* Toast */
-function Toast() {
-  const {s,d} = useApp();
-  const n = s.ui.notif;
-  useEffect(()=>{
-    if (!n) return;
-    const t = setTimeout(()=>d({t:'CLRN'}),4000);
-    return ()=>clearTimeout(t);
-  },[n]);
-  if (!n) return null;
-  const ic = {success:'✅',error:'❌',warning:'⚠️'}[n.type]||'ℹ️';
-  return (
-    <div className="notif">
-      <span style={{fontSize:16}}>{ic}</span>
-      <span style={{fontSize:13,flex:1,color:'#1a1d2e'}}>{n.msg}</span>
-      <button className="btn btn-ghost btn-sm" onClick={()=>d({t:'CLRN'})}>✕</button>
-    </div>
-  );
+function Toast(){
+  const{s,d}=useApp();const n=s.ui.notif;
+  useEffect(()=>{if(!n)return;const t=setTimeout(()=>d({t:'CLRN'}),4000);return()=>clearTimeout(t);},[n]);
+  if(!n)return null;
+  return<div className="notif"><span style={{fontSize:16}}>{n.type==='success'?'✅':n.type==='error'?'❌':'⚠️'}</span><span style={{fontSize:13,flex:1,color:'#1a1d2e'}}>{n.msg}</span><button className="btn btn-ghost btn-sm" onClick={()=>d({t:'CLRN'})}>✕</button></div>;
 }
 
 /* Settings modal */
-function Settings() {
-  const {s,d} = useApp();
-  if (!s.ui.settingsOpen) return null;
-  const [key,setKey] = useState(s.settings.geminiApiKey);
-  const [show,setShow] = useState(false);
-  const [testing,setTesting] = useState(false);
-  const [tres,setTres] = useState(null);
-  const [tmsg,setTmsg] = useState('');
-
-  const close = ()=>d({t:'SETOPEN',p:false});
-  const save = ()=>{
+function Settings(){
+  const{s,d}=useApp();
+  if(!s.ui.settingsOpen)return null;
+  const[key,setKey]=useState(s.settings.geminiApiKey);
+  const[show,setShow]=useState(false);
+  const[testing,setTesting]=useState(false);
+  const[tres,setTres]=useState(null);
+  const[tmsg,setTmsg]=useState('');
+  const close=()=>d({t:'SETOPEN',p:false});
+  const save=()=>{
     d({t:'SAVE_KEY',p:key.trim()});
-    d({t:'SETTINGS',p:{mcqStyle:s.settings.mcqStyle, showAns:s.settings.showAns}});
-    d({t:'NOTIF',p:{type:'success',msg:'Settings saved!'}});
-    close();
+    d({t:'SETTINGS',p:{mcqStyle:s.settings.mcqStyle,showAns:s.settings.showAns}});
+    try{localStorage.setItem('qpb_mcq',s.settings.mcqStyle);}catch(e){}
+    d({t:'NOTIF',p:{type:'success',msg:'Settings saved!'}});close();
   };
-  const test = async ()=>{
-    if (!key.trim()) return;
-    setTesting(true); setTres(null);
-    try { await geminiTest(key.trim()); setTres('ok'); setTmsg('API key works! ✓'); }
-    catch(e){ setTres('fail'); setTmsg(e.message); }
-    finally{ setTesting(false); }
+  const test=async()=>{
+    if(!key.trim())return;setTesting(true);setTres(null);
+    try{await geminiTest(key.trim());setTres('ok');setTmsg('API key works! ✓');}
+    catch(e){setTres('fail');setTmsg(e.message);}
+    finally{setTesting(false);}
   };
-
-  return (
+  return(
     <div className="moverlay" onClick={e=>{if(e.target===e.currentTarget)close()}}>
       <div className="modal">
-        <div className="mhead">
-          <span style={{fontWeight:700,fontSize:15}}>⚙️ Settings</span>
-          <button className="btn btn-ghost btn-sm" onClick={close}>✕</button>
-        </div>
+        <div className="mhead"><span style={{fontWeight:700,fontSize:15}}>⚙️ Settings</span><button className="btn btn-ghost btn-sm" onClick={close}>✕</button></div>
         <div className="mbody">
           <div>
             <div style={{fontWeight:600,fontSize:13,marginBottom:8}}>🔑 Google Gemini API Key</div>
             <p style={{fontSize:12,color:'#6b7299',marginBottom:10,lineHeight:1.6}}>
-              Needed for AI image extraction. Free key at{' '}
-              <a href="https://aistudio.google.com" target="_blank" rel="noreferrer" style={{color:'#4f63f8'}}>aistudio.google.com</a>.
-              Stored only in your browser — never sent to our servers.
+              Needed for AI image extraction. Free key at <a href="https://aistudio.google.com" target="_blank" rel="noreferrer" style={{color:'#4f63f8'}}>aistudio.google.com</a>. Stored only in your browser.
             </p>
             <div style={{position:'relative'}}>
-              <input type={show?'text':'password'} className="inp"
-                placeholder="AIzaSy..." value={key}
-                onChange={e=>{setKey(e.target.value);setTres(null);}}
-                style={{paddingRight:40,fontFamily:'monospace',fontSize:12}}
-              />
-              <button className="btn btn-ghost btn-sm" style={{position:'absolute',right:2,top:'50%',transform:'translateY(-50%)'}}
-                onClick={()=>setShow(v=>!v)}>{show?'🙈':'👁️'}</button>
+              <input type={show?'text':'password'} className="inp" placeholder="AIzaSy..." value={key}
+                onChange={e=>{setKey(e.target.value);setTres(null);}} style={{paddingRight:40,fontFamily:'monospace',fontSize:12}}/>
+              <button className="btn btn-ghost btn-sm" style={{position:'absolute',right:2,top:'50%',transform:'translateY(-50%)'}} onClick={()=>setShow(v=>!v)}>{show?'🙈':'👁️'}</button>
             </div>
-            {tres && (
-              <div style={{marginTop:8,padding:'7px 11px',borderRadius:8,fontSize:12,
-                           background:tres==='ok'?'#f0fdf4':'#fef2f2',
-                           color:tres==='ok'?'#15803d':'#dc2626',
-                           border:'1px solid '+(tres==='ok'?'#bbf7d0':'#fecaca')}}>
-                {tmsg}
-              </div>
-            )}
-            <button className="btn btn-secondary btn-sm" style={{marginTop:8}} onClick={test} disabled={!key.trim()||testing}>
-              {testing?<span className="spin">⟳</span>:null} Test Key
-            </button>
+            {tres&&<div style={{marginTop:8,padding:'7px 11px',borderRadius:8,fontSize:12,background:tres==='ok'?'#f0fdf4':'#fef2f2',color:tres==='ok'?'#15803d':'#dc2626',border:'1px solid '+(tres==='ok'?'#bbf7d0':'#fecaca')}}>{tmsg}</div>}
+            <button className="btn btn-secondary btn-sm" style={{marginTop:8}} onClick={test} disabled={!key.trim()||testing}>{testing?<span className="spin">⟳</span>:null} Test Key</button>
           </div>
-
           <div>
             <div style={{fontWeight:600,fontSize:13,marginBottom:10}}>MCQ Option Labels</div>
             <div style={{display:'flex',gap:20}}>
               {[{v:'bangla',l:'ক, খ, গ, ঘ (Bangla)'},{v:'latin',l:'a, b, c, d (Latin)'}].map(o=>(
                 <label key={o.v} style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer',fontSize:13,fontFamily:"'Hind Siliguri',sans-serif"}}>
-                  <input type="radio" name="ms" value={o.v}
-                    checked={s.settings.mcqStyle===o.v}
-                    onChange={()=>d({t:'SETTINGS',p:{mcqStyle:o.v}})}
-                  /> {o.l}
+                  <input type="radio" name="ms" value={o.v} checked={s.settings.mcqStyle===o.v} onChange={()=>d({t:'SETTINGS',p:{mcqStyle:o.v}})}/> {o.l}
                 </label>
               ))}
             </div>
           </div>
-
           <div style={{display:'flex',alignItems:'center',gap:12}}>
-            <button className={'tog'+(s.settings.showAns?' on':'')}
-              onClick={()=>d({t:'SETTINGS',p:{showAns:!s.settings.showAns}})}>
-              <div className="tog-dot"/>
-            </button>
+            <button className={'tog'+(s.settings.showAns?' on':'')} onClick={()=>d({t:'SETTINGS',p:{showAns:!s.settings.showAns}})}><div className="tog-dot"/></button>
             <span style={{fontSize:13}}>Show correct answer in preview (MCQ)</span>
           </div>
         </div>
-        <div className="mfoot">
-          <button className="btn btn-secondary" onClick={close}>Cancel</button>
-          <button className="btn btn-primary" onClick={save}>Save Settings</button>
-        </div>
+        <div className="mfoot"><button className="btn btn-secondary" onClick={close}>Cancel</button><button className="btn btn-primary" onClick={save}>Save Settings</button></div>
       </div>
     </div>
   );
 }
 
-/* Header editor */
-function HeaderEditor() {
-  const {s,d} = useApp();
-  const h = s.header;
-  const set = k => e => d({t:'HDR',p:{[k]:e.target.value}});
-  return (
+/* Header editor — extended with set, subjectCode */
+function HeaderEditor(){
+  const{s,d}=useApp();const h=s.header;
+  const set=k=>e=>d({t:'HDR',p:{[k]:e.target.value}});
+  return(
     <div className="card" style={{padding:18}}>
       <div className="sec-hdr">Paper Header</div>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-        <div style={{gridColumn:'1/-1'}}>
-          <label className="lbl">School / College Name</label>
-          <input className="inp" placeholder="ঢাকা সরকারি উচ্চ বিদ্যালয়" value={h.schoolName} onChange={set('schoolName')}/>
-        </div>
-        <div style={{gridColumn:'1/-1'}}>
-          <label className="lbl">Exam Title (পরীক্ষার নাম)</label>
-          <input className="inp" placeholder="বার্ষিক পরীক্ষা ২০২৫" value={h.examTitle} onChange={set('examTitle')}/>
-        </div>
-        <div>
-          <label className="lbl">Subject (বিষয়)</label>
-          <input className="inp" placeholder="পদার্থবিজ্ঞান" value={h.subject} onChange={set('subject')}/>
-        </div>
-        <div>
-          <label className="lbl">Year (সাল)</label>
-          <input className="inp" placeholder="2025" value={h.year} onChange={set('year')}/>
-        </div>
-        <div>
-          <label className="lbl">Time (সময়)</label>
-          <input className="inp" placeholder="৩ ঘণ্টা / 3 Hours" value={h.time} onChange={set('time')}/>
-        </div>
-        <div>
-          <label className="lbl">Total Marks (পূর্ণমান)</label>
-          <input className="inp" placeholder="100" value={h.totalMarks} onChange={set('totalMarks')}/>
-        </div>
-        <div style={{gridColumn:'1/-1'}}>
-          <label className="lbl">Instructions (নির্দেশাবলি)</label>
-          <textarea className="ta" rows={2} placeholder="সকল প্রশ্নের উত্তর দিতে হবে।" value={h.instructions} onChange={set('instructions')}/>
-        </div>
+        <div style={{gridColumn:'1/-1'}}><label className="lbl">School / College Name (বিদ্যালয়/কলেজ)</label><input className="inp" placeholder="ঢাকা সরকারি উচ্চ বিদ্যালয়" value={h.schoolName} onChange={set('schoolName')}/></div>
+        <div style={{gridColumn:'1/-1'}}><label className="lbl">Exam Title (পরীক্ষার নাম)</label><input className="inp" placeholder="এসএসসি পরীক্ষা - ২০২৬" value={h.examTitle} onChange={set('examTitle')}/></div>
+        <div><label className="lbl">Subject (বিষয়)</label><input className="inp" placeholder="উচ্চতর গণিত" value={h.subject} onChange={set('subject')}/></div>
+        <div><label className="lbl">Subject Code</label><input className="inp" placeholder="126" value={h.subjectCode||''} onChange={set('subjectCode')}/></div>
+        <div><label className="lbl">Time (সময়)</label><input className="inp" placeholder="৩ ঘণ্টা" value={h.time} onChange={set('time')}/></div>
+        <div><label className="lbl">Total Marks (পূর্ণমান)</label><input className="inp" placeholder="100" value={h.totalMarks} onChange={set('totalMarks')}/></div>
+        <div><label className="lbl">Set (সেট)</label><input className="inp" placeholder="পায়রা / A" value={h.set||''} onChange={set('set')}/></div>
+        <div><label className="lbl">Year (সাল)</label><input className="inp" placeholder="2026" value={h.year} onChange={set('year')}/></div>
+        <div style={{gridColumn:'1/-1'}}><label className="lbl">Instructions (নির্দেশাবলি / দ্রষ্টব্য)</label><textarea className="ta" rows={2} placeholder="দ্রষ্টব্যঃ সরবরাহকৃত নৈর্ব্যক্তিক অভীক্ষার উত্তরপত্রে সঠিক উত্তরের বৃত্তটি ভরাট করতে হবে। প্রতিটি প্রশ্নের মান ১।" value={h.instructions} onChange={set('instructions')}/></div>
       </div>
+    </div>
+  );
+}
+
+/* Clipboard paste helper */
+function useClipboardPaste(onImage){
+  const handlePaste=useCallback(e=>{
+    const items=e.clipboardData?.items;
+    if(!items)return;
+    for(const item of items){
+      if(item.type.startsWith('image/')){
+        e.preventDefault();
+        const file=item.getAsFile();
+        if(file)onImage(file);
+        break;
+      }
+    }
+  },[onImage]);
+  return handlePaste;
+}
+
+/* Diagram mini-upload for CQ */
+function DiagramUpload({q}){
+  const{d}=useApp();
+  const ref=useRef();
+  const[dov,setDov]=useState(false);
+
+  const pick=files=>{
+    const f=files&&files[0];if(!f)return;
+    const r=new FileReader();
+    r.onload=()=>d({t:'UPD_Q',id:q.id,p:{diagramImg:r.result}});
+    r.readAsDataURL(f);
+  };
+  const pasteHandler=useClipboardPaste(f=>pick([f]));
+
+  if(q.diagramImg){
+    return(
+      <div style={{marginTop:8,position:'relative'}}>
+        <img src={q.diagramImg} alt="diagram" style={{maxWidth:'100%',maxHeight:120,objectFit:'contain',borderRadius:6,border:'1px solid #e8e5de',display:'block'}}/>
+        <button className="btn btn-danger btn-sm" style={{position:'absolute',top:4,right:4,padding:'2px 6px'}}
+          onClick={()=>d({t:'UPD_Q',id:q.id,p:{diagramImg:null}})}>✕</button>
+      </div>
+    );
+  }
+  return(
+    <div
+      className={'diag-zone'+(dov?' dov':'')}
+      tabIndex={0}
+      onPaste={pasteHandler}
+      onDragOver={e=>{e.preventDefault();setDov(true)}}
+      onDragLeave={()=>setDov(false)}
+      onDrop={e=>{e.preventDefault();setDov(false);pick(e.dataTransfer.files)}}
+      onClick={()=>ref.current?.click()}
+      title="Click, drag-drop, or Ctrl+V to paste diagram"
+    >
+      <input ref={ref} type="file" accept="image/*" style={{display:'none'}} onChange={e=>pick(e.target.files)}/>
+      📐 Add Diagram (optional) — click, drag, or Ctrl+V to paste
     </div>
   );
 }
 
 /* MCQ form */
-function MCQForm({q}) {
-  const {s,d} = useApp();
-  const BN={a:'ক',b:'খ',c:'গ',d:'ঘ'}, LA={a:'a',b:'b',c:'c',d:'d'};
-  const L = s.settings.mcqStyle==='bangla'?BN:LA;
-  const upd = p => d({t:'UPD_Q',id:q.id,p});
-  return (
-    <div style={{display:'flex',flexDirection:'column',gap:11}}>
-      <div>
-        <label className="lbl">Question Stem</label>
-        <textarea className="ta" rows={3} placeholder="Type question... use $x^2$ for math"
-          value={q.stem||''} onChange={e=>upd({stem:e.target.value})}/>
-      </div>
+function MCQForm({q}){
+  const{s,d}=useApp();
+  const BN={a:'ক',b:'খ',c:'গ',d:'ঘ'},LA={a:'a',b:'b',c:'c',d:'d'};
+  const L=s.settings.mcqStyle==='bangla'?BN:LA;
+  const upd=p=>d({t:'UPD_Q',id:q.id,p});
+  return(
+    <div style={{display:'flex',flexDirection:'column',gap:10}}>
+      <div><label className="lbl">Question Stem</label><textarea className="ta" rows={3} placeholder="Type MCQ... use $x^2$ for math" value={q.stem||''} onChange={e=>upd({stem:e.target.value})}/></div>
       {['a','b','c','d'].map(k=>(
         <div key={k} className="opt-row">
           <div className="opt-lbl">{L[k]}</div>
-          <input className="inp" style={{flex:1}} placeholder={'Option '+L[k]}
-            value={q.options?.[k]||''} onChange={e=>upd({options:{...q.options,[k]:e.target.value}})}/>
+          <input className="inp" style={{flex:1}} placeholder={'Option '+L[k]} value={q.options?.[k]||''} onChange={e=>upd({options:{...q.options,[k]:e.target.value}})}/>
           <label style={{display:'flex',alignItems:'center',gap:4,cursor:'pointer',flexShrink:0}}>
-            <input type="radio" name={'c'+q.id} value={k}
-              checked={q.correctAnswer===k}
-              onChange={()=>upd({correctAnswer:k})}
-              style={{accentColor:'#16a34a'}}/>
-            <span style={{fontSize:11,color:'#6b7299'}}>✓</span>
+            <input type="radio" name={'c'+q.id} value={k} checked={q.correctAnswer===k} onChange={()=>upd({correctAnswer:k})} style={{accentColor:'#16a34a'}}/><span style={{fontSize:11,color:'#6b7299'}}>✓</span>
           </label>
         </div>
       ))}
       <div style={{display:'flex',alignItems:'center',gap:10}}>
         <label className="lbl" style={{margin:0,whiteSpace:'nowrap'}}>Marks:</label>
-        <input type="number" min={1} max={10} className="inp" style={{width:60,textAlign:'center'}}
-          value={q.marks||1} onChange={e=>upd({marks:parseInt(e.target.value)||1})}/>
-        <span style={{fontSize:11,color:'#9ca3af'}}>Correct: <strong>{q.correctAnswer?L[q.correctAnswer]:'—'}</strong></span>
+        <input type="number" min={1} max={10} className="inp" style={{width:60,textAlign:'center'}} value={q.marks||1} onChange={e=>upd({marks:parseInt(e.target.value)||1})}/>
       </div>
     </div>
   );
 }
 
-/* CQ form */
-function CQForm({q}) {
-  const {d} = useApp();
-  const upd = p => d({t:'UPD_Q',id:q.id,p});
-  const subs=[
-    {k:'subA',bn:'ক) জ্ঞানমূলক',en:'Knowledge (1 mark)',m:1},
-    {k:'subB',bn:'খ) অনুধাবনমূলক',en:'Comprehension (2 marks)',m:2},
-    {k:'subC',bn:'গ) প্রয়োগমূলক',en:'Application (3 marks)',m:3},
-    {k:'subD',bn:'ঘ) উচ্চতর দক্ষতামূলক',en:'Higher-order (4 marks)',m:4},
-  ];
-  return (
-    <div style={{display:'flex',flexDirection:'column',gap:11}}>
+/* CQ form — with diagram support */
+function CQForm({q}){
+  const{d}=useApp();
+  const upd=p=>d({t:'UPD_Q',id:q.id,p});
+  const subs=[{k:'subA',bn:'ক) জ্ঞানমূলক',en:'Knowledge (1 mark)',m:1},{k:'subB',bn:'খ) অনুধাবনমূলক',en:'Comprehension (2 marks)',m:2},{k:'subC',bn:'গ) প্রয়োগমূলক',en:'Application (3 marks)',m:3},{k:'subD',bn:'ঘ) উচ্চতর দক্ষতামূলক',en:'Higher-order (4 marks)',m:4}];
+  return(
+    <div style={{display:'flex',flexDirection:'column',gap:10}}>
       <div>
         <label className="lbl">উদ্দীপক / Stimulus</label>
-        <textarea className="ta" rows={4} style={{background:'#fffbeb',borderColor:'#fcd34d'}}
-          placeholder="Type the passage/stimulus here..."
-          value={q.stimulus||''} onChange={e=>upd({stimulus:e.target.value})}/>
+        <textarea className="ta" rows={4} style={{background:'#fffbeb',borderColor:'#fcd34d'}} placeholder="Type stimulus/passage here..." value={q.stimulus||''} onChange={e=>upd({stimulus:e.target.value})}/>
+        <DiagramUpload q={q}/>
       </div>
       <div style={{display:'flex',alignItems:'center',gap:8,color:'#9ca3af',fontSize:11}}>
         <div style={{flex:1,height:1,background:'#e8e5de'}}/> Sub-questions <div style={{flex:1,height:1,background:'#e8e5de'}}/>
@@ -593,271 +495,175 @@ function CQForm({q}) {
         <div key={sub.k} className="cq-row">
           <div className="cq-chip">{sub.m}</div>
           <div style={{flex:1}}>
-            <label className="lbl" style={{color:'#6d28d9',fontFamily:"'Hind Siliguri',sans-serif"}}>
-              {sub.bn} <span style={{fontWeight:400,color:'#9ca3af'}}>({sub.en})</span>
-            </label>
-            <textarea className="ta" rows={2}
-              placeholder={sub.bn+'...'}
-              value={q[sub.k]||''} onChange={e=>upd({[sub.k]:e.target.value})}/>
+            <label className="lbl" style={{color:'#6d28d9',fontFamily:"'Hind Siliguri',sans-serif"}}>{sub.bn} <span style={{fontWeight:400,color:'#9ca3af'}}>({sub.en})</span></label>
+            <textarea className="ta" rows={2} placeholder={sub.bn+'...'} value={q[sub.k]||''} onChange={e=>upd({[sub.k]:e.target.value})}/>
           </div>
         </div>
       ))}
-      <div style={{background:'#f5f3ff',border:'1px solid #ddd6fe',borderRadius:8,padding:'7px 11px',fontSize:12,color:'#6d28d9'}}>
-        Total: <strong>10 marks</strong> (1+2+3+4) — SSC/HSC standard CQ
-      </div>
+      <div style={{background:'#f5f3ff',border:'1px solid #ddd6fe',borderRadius:8,padding:'7px 11px',fontSize:12,color:'#6d28d9'}}>Total: <strong>10 marks</strong> (1+2+3+4)</div>
     </div>
   );
 }
 
 /* SQ form */
-function SQForm({q}) {
-  const {d} = useApp();
-  const upd = p => d({t:'UPD_Q',id:q.id,p});
-  return (
+function SQForm({q}){
+  const{d}=useApp();const upd=p=>d({t:'UPD_Q',id:q.id,p});
+  return(
     <div style={{display:'flex',flexDirection:'column',gap:10}}>
-      <div>
-        <label className="lbl">Question (প্রশ্ন)</label>
-        <textarea className="ta" rows={4} placeholder="Type question... $math$ supported"
-          value={q.stem||''} onChange={e=>upd({stem:e.target.value})}/>
-      </div>
+      <div><label className="lbl">Question</label><textarea className="ta" rows={4} placeholder="Type question... $math$ supported" value={q.stem||''} onChange={e=>upd({stem:e.target.value})}/></div>
       <div style={{display:'flex',alignItems:'center',gap:10}}>
-        <label className="lbl" style={{margin:0,whiteSpace:'nowrap'}}>Marks:</label>
-        <input type="number" min={1} max={20} className="inp" style={{width:60,textAlign:'center'}}
-          value={q.marks||5} onChange={e=>upd({marks:parseInt(e.target.value)||5})}/>
+        <label className="lbl" style={{margin:0}}>Marks:</label>
+        <input type="number" min={1} max={20} className="inp" style={{width:60,textAlign:'center'}} value={q.marks||5} onChange={e=>upd({marks:parseInt(e.target.value)||5})}/>
       </div>
     </div>
   );
 }
 
 /* Question card */
-function QCard({q,idx,onDS,onDE,onDEnd}) {
-  const {s,d} = useApp();
-  const [open,setOpen] = useState(true);
-  const isActive = s.ui.activeId===q.id;
+function QCard({q,idx,onDS,onDE,onDEnd}){
+  const{s,d}=useApp();
+  const[open,setOpen]=useState(true);
+  const isActive=s.ui.activeId===q.id;
   const meta={mcq:{l:'MCQ',b:'badge-mcq',c:'mc'},cq:{l:'সৃজনশীল',b:'badge-cq',c:'cq'},sq:{l:'Short Q',b:'badge-sq',c:'sq'}}[q.type]||{l:'Q',b:'badge-sq',c:'sq'};
-  const prev=(q.stem||q.stimulus||'').slice(0,65);
-  return (
-    <div className={'qcard '+meta.c+(isActive?' active':'')}
-      draggable onDragStart={onDS} onDragEnter={onDE} onDragEnd={onDEnd} onDragOver={e=>e.preventDefault()}
-      onClick={()=>d({t:'ACTIVE',p:q.id})}>
+  const prev=(q.stem||q.stimulus||'').slice(0,60);
+  return(
+    <div className={'qcard '+meta.c+(isActive?' active':'')} draggable onDragStart={onDS} onDragEnter={onDE} onDragEnd={onDEnd} onDragOver={e=>e.preventDefault()} onClick={()=>d({t:'ACTIVE',p:q.id})}>
       <div className="qcard-head">
         <span style={{cursor:'grab',color:'#c4c4c4',fontSize:16,userSelect:'none'}}>⠿</span>
         <span className="qnum">{idx+1}</span>
         <span className={'badge '+meta.b}>{meta.l}</span>
-        <span className="qprev">{prev||'(empty)'}{prev.length>=65?'…':''}</span>
+        <span className="qprev">{prev||'(empty)'}{prev.length>=60?'…':''}</span>
         <span style={{fontSize:11,color:'#9ca3af',flexShrink:0}}>{q.type==='cq'?10:q.marks}pts</span>
-        <button className="btn btn-ghost btn-sm" style={{padding:'3px 7px'}}
-          onClick={e=>{e.stopPropagation();setOpen(v=>!v)}}>{open?'▲':'▼'}</button>
-        <button className="btn btn-danger btn-sm" style={{padding:'3px 7px'}}
-          onClick={e=>{e.stopPropagation();d({t:'DEL_Q',id:q.id})}}>🗑</button>
+        <button className="btn btn-ghost btn-sm" style={{padding:'3px 7px'}} onClick={e=>{e.stopPropagation();setOpen(v=>!v)}}>{open?'▲':'▼'}</button>
+        <button className="btn btn-danger btn-sm" style={{padding:'3px 7px'}} onClick={e=>{e.stopPropagation();d({t:'DEL_Q',id:q.id})}}>🗑</button>
       </div>
-      {open && (
-        <div className="qcard-body">
-          {q.type==='mcq' && <MCQForm q={q}/>}
-          {q.type==='cq'  && <CQForm q={q}/>}
-          {q.type==='sq'  && <SQForm q={q}/>}
-        </div>
-      )}
+      {open&&<div className="qcard-body">{q.type==='mcq'&&<MCQForm q={q}/>}{q.type==='cq'&&<CQForm q={q}/>}{q.type==='sq'&&<SQForm q={q}/>}</div>}
     </div>
   );
 }
 
 /* Question list */
-function QList() {
-  const {s,d} = useApp();
-  const {questions} = s;
-  const di = useRef(null), dv = useRef(null);
-  const add = t => d({t:'ADD_Q',p:t});
-  const reorder = ()=>{
-    if (di.current===null||dv.current===null||di.current===dv.current) return;
-    const qs=[...questions];
-    const [m]=qs.splice(di.current,1);
-    qs.splice(dv.current,0,m);
-    d({t:'REORDER',p:qs});
-    di.current=null; dv.current=null;
+function QList(){
+  const{s,d}=useApp();const{questions}=s;
+  const di=useRef(null),dv=useRef(null);
+  const add=t=>d({t:'ADD_Q',p:t});
+  const reorder=()=>{
+    if(di.current===null||dv.current===null||di.current===dv.current)return;
+    const qs=[...questions];const[m]=qs.splice(di.current,1);qs.splice(dv.current,0,m);
+    d({t:'REORDER',p:qs});di.current=null;dv.current=null;
   };
-  return (
+  return(
     <div>
       <div className="add-btns">
         <button className="btn btn-secondary" style={{color:'#1d4ed8',borderColor:'#bfdbfe'}} onClick={()=>add('mcq')}>📝 + MCQ</button>
         <button className="btn btn-secondary" style={{color:'#6d28d9',borderColor:'#ddd6fe',fontFamily:"'Hind Siliguri',sans-serif"}} onClick={()=>add('cq')}>📚 + সৃজনশীল</button>
         <button className="btn btn-secondary" style={{color:'#0f766e',borderColor:'#99f6e4'}} onClick={()=>add('sq')}>✏️ + Short Q</button>
       </div>
-      {questions.length===0 && (
+      {questions.length===0&&(
         <div className="card" style={{padding:40,textAlign:'center'}}>
           <div style={{fontSize:36,marginBottom:12}}>📋</div>
           <p style={{fontWeight:600,color:'#1a1d2e',marginBottom:6}}>No questions yet</p>
-          <p style={{fontSize:13,color:'#6b7299',maxWidth:260,margin:'0 auto',lineHeight:1.6}}>
-            Click above to add MCQ, Creative, or Short questions — or upload an image to auto-extract.
-          </p>
+          <p style={{fontSize:13,color:'#6b7299',maxWidth:260,margin:'0 auto',lineHeight:1.6}}>Add questions above or upload an image to auto-extract.</p>
         </div>
       )}
       {questions.map((q,i)=>(
-        <QCard key={q.id} q={q} idx={i}
-          onDS={()=>{di.current=i}}
-          onDE={()=>{dv.current=i}}
-          onDEnd={reorder}
-        />
+        <QCard key={q.id} q={q} idx={i} onDS={()=>{di.current=i}} onDE={()=>{dv.current=i}} onDEnd={reorder}/>
       ))}
     </div>
   );
 }
 
-/* Image upload — clean 1-step Gemini vision */
-function ImgUpload() {
-  const {s,d} = useApp();
-  const [file,setFile]   = useState(null);
-  const [prev,setPrev]   = useState(null);
-  const [loading,setLoad]= useState(false);
-  const [result,setRes]  = useState(null);
-  const [err,setErr]     = useState('');
-  const [dov,setDov]     = useState(false);
-  const ref = useRef();
+/* Image upload — 1-step Gemini vision + Ctrl+V paste support */
+function ImgUpload(){
+  const{s,d}=useApp();
+  const[file,setFile]=useState(null);
+  const[prev,setPrev]=useState(null);
+  const[loading,setLoad]=useState(false);
+  const[result,setRes]=useState(null);
+  const[err,setErr]=useState('');
+  const[dov,setDov]=useState(false);
+  const ref=useRef();
+  const zoneRef=useRef();
 
-  const pick = files => {
-    const f = files&&files[0]; if(!f) return;
-    setFile(f); setErr(''); setRes(null);
-    setPrev(URL.createObjectURL(f));
+  const pick=files=>{
+    const f=files&&files[0];if(!f)return;
+    setFile(f);setErr('');setRes(null);setPrev(URL.createObjectURL(f));
   };
+  const pasteHandler=useClipboardPaste(f=>pick([f]));
 
-  const extract = async () => {
-    setLoad(true); setErr('');
-    try {
-      const qs = await geminiVision(file, s.settings.geminiApiKey);
-      setRes(qs);
-    } catch(e) {
-      setErr(e.message);
-    } finally {
-      setLoad(false);
-    }
+  const extract=async()=>{
+    setLoad(true);setErr('');
+    try{const qs=await geminiVision(file,s.settings.geminiApiKey);setRes(qs);}
+    catch(e){setErr(e.message);}
+    finally{setLoad(false);}
   };
-
-  const importAll = () => {
-    if (!result||!result.length) return;
+  const importAll=()=>{
+    if(!result||!result.length)return;
     d({t:'IMPORT',p:result});
     d({t:'NOTIF',p:{type:'success',msg:result.length+' question(s) imported!'}});
     clear();
   };
+  const clear=()=>{setFile(null);if(prev)URL.revokeObjectURL(prev);setPrev(null);setRes(null);setErr('');};
 
-  const clear = () => {
-    setFile(null); if(prev) URL.revokeObjectURL(prev);
-    setPrev(null); setRes(null); setErr('');
-  };
-
-  return (
+  return(
     <div className="card" style={{padding:18}}>
       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
         <div className="sec-hdr" style={{margin:0}}>AI Image Extraction</div>
         <span className="badge badge-mcq" style={{fontSize:10}}>Gemini 2.5 Flash</span>
       </div>
-      <p style={{fontSize:12,color:'#6b7299',marginBottom:14,lineHeight:1.6}}>
-        Upload a photo of a question paper → Gemini reads and auto-fills all questions instantly.
-      </p>
-
-      {/* Drop zone */}
-      {!file && (
-        <div className={'dropzone'+(dov?' dov':'')}
+      <p style={{fontSize:12,color:'#6b7299',marginBottom:14,lineHeight:1.6}}>Upload or paste (Ctrl+V) a photo of a question paper → Gemini auto-extracts all questions.</p>
+      {!file?(
+        <div ref={zoneRef} className={'dropzone'+(dov?' dov':'')} tabIndex={0}
+          onPaste={pasteHandler}
           onDragOver={e=>{e.preventDefault();setDov(true)}}
           onDragLeave={()=>setDov(false)}
           onDrop={e=>{e.preventDefault();setDov(false);pick(e.dataTransfer.files)}}
           onClick={()=>ref.current&&ref.current.click()}>
           <input ref={ref} type="file" accept="image/*" style={{display:'none'}} onChange={e=>pick(e.target.files)}/>
           <div style={{fontSize:28,marginBottom:8}}>🖼️</div>
-          <p style={{fontWeight:600,fontSize:13,color:'#1a1d2e',marginBottom:4}}>
-            {dov?'Drop image here':'Drag & drop or click to upload'}
-          </p>
+          <p style={{fontWeight:600,fontSize:13,color:'#1a1d2e',marginBottom:4}}>{dov?'Drop here':'Drag & drop, click, or Ctrl+V to paste'}</p>
           <p style={{fontSize:11,color:'#9ca3af'}}>PNG, JPG, WEBP — max 10 MB</p>
         </div>
-      )}
-
-      {/* File picked — show preview + actions */}
-      {file && (
+      ):(
         <div style={{display:'flex',flexDirection:'column',gap:10}}>
           <div style={{position:'relative',borderRadius:10,overflow:'hidden',border:'1px solid #e8e5de'}}>
             <img src={prev} alt="Question paper" style={{width:'100%',maxHeight:200,objectFit:'contain',background:'#f5f3ee',display:'block'}}/>
-            <button className="btn btn-ghost btn-sm"
-              style={{position:'absolute',top:6,right:6,background:'#fff',border:'1px solid #e8e5de'}}
-              onClick={clear}>✕</button>
+            <button className="btn btn-ghost btn-sm" style={{position:'absolute',top:6,right:6,background:'#fff',border:'1px solid #e8e5de'}} onClick={clear}>✕</button>
           </div>
-
-          <p style={{fontSize:11,color:'#6b7299'}}>
-            <strong>{file.name}</strong> — {(file.size/1024).toFixed(0)} KB
-          </p>
-
-          {/* Error */}
-          {err && (
-            <div style={{background:'#fef2f2',border:'1px solid #fecaca',borderRadius:8,
-                         padding:'8px 12px',fontSize:12,color:'#dc2626',lineHeight:1.6}}>
-              ⚠️ {err}
-            </div>
-          )}
-
-          {/* Loading state */}
-          {loading && (
-            <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',
-                         background:'#f0f4ff',border:'1px solid #c7d2fe',borderRadius:8}}>
-              <span className="spin" style={{fontSize:18}}>⟳</span>
-              <div>
-                <p style={{fontWeight:600,fontSize:12,color:'#3730a3'}}>Gemini analyzing image…</p>
-                <p style={{fontSize:11,color:'#6366f1'}}>Reading Bangla text, detecting question types</p>
-              </div>
-            </div>
-          )}
-
-          {/* Results */}
-          {result && !loading && (
-            <div style={{background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:8,
-                         padding:'10px 12px',fontSize:12,color:'#15803d'}}>
-              <div style={{fontWeight:700,marginBottom:5}}>✅ Found {result.length} question(s)</div>
-              <ul style={{listStyle:'disc',paddingLeft:16,color:'#166534'}}>
-                {result.slice(0,5).map((q,i)=>(
-                  <li key={i}>[{(q.type||'?').toUpperCase()}] {(q.stem||q.stimulus||'').slice(0,50)}</li>
-                ))}
-                {result.length>5 && <li>…and {result.length-5} more</li>}
-              </ul>
-            </div>
-          )}
-
-          {/* Action buttons */}
+          <p style={{fontSize:11,color:'#6b7299'}}><strong>{file.name}</strong> — {(file.size/1024).toFixed(0)} KB</p>
+          {err&&<div style={{background:'#fef2f2',border:'1px solid #fecaca',borderRadius:8,padding:'8px 12px',fontSize:12,color:'#dc2626',lineHeight:1.6}}>⚠️ {err}</div>}
+          {loading&&<div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:'#f0f4ff',border:'1px solid #c7d2fe',borderRadius:8}}>
+            <span className="spin" style={{fontSize:18}}>⟳</span>
+            <div><p style={{fontWeight:600,fontSize:12,color:'#3730a3'}}>Gemini analyzing image…</p><p style={{fontSize:11,color:'#6366f1'}}>Reading Bangla text, detecting question types</p></div>
+          </div>}
+          {result&&!loading&&<div style={{background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:8,padding:'10px 12px',fontSize:12,color:'#15803d'}}>
+            <div style={{fontWeight:700,marginBottom:5}}>✅ Found {result.length} question(s)</div>
+            <ul style={{listStyle:'disc',paddingLeft:16,color:'#166534'}}>
+              {result.slice(0,5).map((q,i)=><li key={i}>[{(q.type||'?').toUpperCase()}] {(q.stem||q.stimulus||'').slice(0,50)}</li>)}
+              {result.length>5&&<li>…and {result.length-5} more</li>}
+            </ul>
+          </div>}
           <div style={{display:'flex',gap:8}}>
-            {!result && (
-              <button className="btn btn-primary" style={{flex:1}}
-                onClick={extract} disabled={loading}>
-                {loading
-                  ? <><span className="spin">⟳</span> Analyzing…</>
-                  : <>✨ Extract with Gemini</>}
-              </button>
-            )}
-            {result && (
-              <button className="btn btn-primary" style={{flex:1}} onClick={importAll}>
-                ✅ Import {result.length} Question{result.length>1?'s':''}
-              </button>
-            )}
-            {result && (
-              <button className="btn btn-secondary" onClick={()=>{setRes(null);setErr('');}}>
-                ↩ Re-extract
-              </button>
-            )}
+            {!result&&<button className="btn btn-primary" style={{flex:1}} onClick={extract} disabled={loading}>{loading?<><span className="spin">⟳</span> Analyzing…</>:<>✨ Extract with Gemini</>}</button>}
+            {result&&<button className="btn btn-primary" style={{flex:1}} onClick={importAll}>✅ Import {result.length} Question{result.length>1?'s':''}</button>}
+            {result&&<button className="btn btn-secondary" onClick={()=>{setRes(null);setErr('');}}>↩ Re-extract</button>}
             <button className="btn btn-secondary" onClick={clear}>Clear</button>
           </div>
-
-          {/* Quota reminder */}
-          <p style={{fontSize:10,color:'#9ca3af',textAlign:'center'}}>
-            Free tier: 250 images/day · 10 req/min · gemini-2.5-flash
-          </p>
+          <p style={{fontSize:10,color:'#9ca3af',textAlign:'center'}}>Free tier: 250 images/day · 10 req/min</p>
         </div>
       )}
     </div>
   );
 }
 
-/* Paper preview */
-function Preview({forPDF}) {
-  const {s} = useApp();
-  const {header:h, questions, settings} = s;
-  const BN={a:'ক',b:'খ',c:'গ',d:'ঘ'}, LA={a:'a',b:'b',c:'c',d:'d'};
-  const L = settings.mcqStyle==='bangla'?BN:LA;
-  const sa = settings.showAns;
+/* ══ PAPER PREVIEW — Board standard layout ══ */
+function Preview({forPDF}){
+  const{s}=useApp();
+  const{header:h,questions,settings}=s;
+  const lang=settings.lang||'bn';
+  const tr=T[lang];
+  const L=tr.opts;
+  const sa=settings.showAns;
   const mcqs=questions.filter(q=>q.type==='mcq');
   const cqs=questions.filter(q=>q.type==='cq');
   const sqs=questions.filter(q=>q.type==='sq');
@@ -865,126 +671,186 @@ function Preview({forPDF}) {
   const cmk=cqs.length*10;
   const smk=sqs.reduce((a,q)=>a+(q.marks||5),0);
 
-  return (
+  return(
     <div id={forPDF?'pdf-root':undefined} className="pp">
-      {/* Header */}
+
+      {/* ── Board-standard header ── */}
       <div className="pp-hdr">
-        {h.schoolName&&<h1 className="bn-serif">{h.schoolName}</h1>}
-        {h.examTitle &&<h2 className="bn-serif">{h.examTitle}</h2>}
-        <div className="pp-meta">
-          <div className="bn">{h.subject&&<><strong>বিষয়:</strong> {h.subject}</>}{h.year?' | '+h.year:''}</div>
-          <div className="bn">{h.time&&<><strong>সময়:</strong> {h.time}</>}</div>
-          <div className="bn">{h.totalMarks&&<><strong>পূর্ণমান:</strong> {h.totalMarks}</>}</div>
-        </div>
-        {h.instructions&&<p style={{fontSize:'10pt',marginTop:8,fontStyle:'italic',textAlign:'left'}} className="bn">{h.instructions}</p>}
+        {h.schoolName&&<div className="pp-school bn-serif">{h.schoolName}</div>}
+        {h.examTitle&&<div className="pp-exam bn-serif">{h.examTitle}</div>}
+        {(h.subject||h.subjectCode)&&(
+          <div className="pp-subject bn-serif">
+            {h.subject&&<span>{tr.subject}: {h.subject}</span>}
+            {h.subjectCode&&<span style={{marginLeft:12,fontWeight:400,fontSize:'11pt'}}>[{h.subjectCode}]</span>}
+          </div>
+        )}
+        {/* Meta row — time left, marks right */}
+        {(h.time||h.totalMarks||h.year)&&(
+          <div className="pp-meta-row bn">
+            <div className="pp-meta-left">
+              {h.time&&<span><strong>{tr.time}:</strong> {h.time}</span>}
+            </div>
+            <div style={{textAlign:'center',flex:1,color:'#555',fontSize:'10pt'}}>{h.year}</div>
+            <div className="pp-meta-right">
+              {h.totalMarks&&<span><strong>{tr.marks}:</strong> {h.totalMarks}</span>}
+            </div>
+          </div>
+        )}
+        {/* Set row */}
+        {h.set&&(
+          <div className="pp-meta-row2 bn">
+            <span><strong>{tr.set}:</strong> {h.set}</span>
+            <span><strong>{tr.received}:</strong> ____</span>
+          </div>
+        )}
+        {/* Instructions */}
+        {h.instructions&&<div className="pp-instruction bn">{h.instructions}</div>}
       </div>
 
-      {/* Empty */}
+      {/* Empty state */}
       {questions.length===0&&(
-        <div className="prev-empty">
-          <div style={{fontSize:36,marginBottom:10}}>📄</div>
-          <p style={{fontWeight:600}}>Your paper will appear here</p>
-          <p style={{fontSize:12,marginTop:4}}>Add questions in the editor on the left</p>
-        </div>
+        <div className="prev-empty"><div style={{fontSize:36,marginBottom:10}}>📄</div><p style={{fontWeight:600}}>Your paper will appear here</p><p style={{fontSize:12,marginTop:4}}>Add questions in the editor on the left</p></div>
       )}
 
-      {/* MCQ */}
+      {/* ── MCQ Section — two-column layout ── */}
       {mcqs.length>0&&<>
-        <div className="sec-title bn-serif">বহুনির্বাচনি প্রশ্ন / Multiple Choice <span style={{fontSize:'11pt',fontWeight:400,marginLeft:10}}>[{mmk} marks]</span></div>
-        {mcqs.map((q,i)=>(
-          <div key={q.id} className="qblock">
-            <div className="qstem"><span style={{marginRight:6}}>{i+1}.</span><MText t={q.stem}/><span style={{fontSize:'10pt',fontWeight:400,color:'#6b7299',marginLeft:8}}>({q.marks})</span></div>
-            <div className="mcq-opts">
-              {['a','b','c','d'].map(k=>(
-                <div key={k} className={'mcq-opt'+(sa&&q.correctAnswer===k?' correct-opt':'')}>
-                  <span className="bn-serif">{L[k]}.</span>
-                  <MText t={q.options?.[k]||''}/>
-                  {sa&&q.correctAnswer===k&&<span style={{color:'#15803d',marginLeft:4}}>✓</span>}
-                </div>
-              ))}
+        <div className="pp-sec bn-serif">
+          {tr.mcqSection}
+          <span className="pp-sec-sub">[{lang==='bn'?tr.markNum(mmk):mmk} {lang==='bn'?'নম্বর':'marks'}]</span>
+        </div>
+        <div className="pp-two-col">
+          {mcqs.map((q,i)=>(
+            <div key={q.id} className="qblock">
+              <div className="qstem bn">
+                <span className="qstem-num">{lang==='bn'?toBanglaNum(i+1):i+1}.</span>
+                <span style={{flex:1}}><MText t={q.stem}/></span>
+                <span className="qmarks">{lang==='bn'?toBanglaNum(q.marks||1):q.marks||1}</span>
+              </div>
+              <div className="mcq-opts">
+                {['a','b','c','d'].map(k=>(
+                  <div key={k} className={'mcq-opt bn'+(sa&&q.correctAnswer===k?' correct-opt':'')}>
+                    <span className="bn-serif" style={{fontWeight:600,flexShrink:0}}>({L[k]})</span>
+                    <MText t={q.options?.[k]||''}/>
+                    {sa&&q.correctAnswer===k&&<span style={{color:'#15803d',marginLeft:3}}>✓</span>}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </>}
 
-      {/* CQ */}
-      {cqs.length>0&&<>
-        <div className="sec-title bn-serif">সৃজনশীল প্রশ্ন / Creative Questions <span style={{fontSize:'11pt',fontWeight:400,marginLeft:10}}>[{cmk} marks]</span></div>
-        {cqs.map((q,i)=>(
-          <div key={q.id} className="qblock">
-            <div className="qstem"><span style={{marginRight:6}}>{i+1}.</span><span className="bn-serif">উদ্দীপক:</span></div>
-            <div className="cq-stim bn"><MText t={q.stimulus}/></div>
-            <div className="cq-subs bn">
-              {[{k:'subA',l:'ক',m:1},{k:'subB',l:'খ',m:2},{k:'subC',l:'গ',m:3},{k:'subD',l:'ঘ',m:4}].map(sub=>q[sub.k]?(
-                <div key={sub.k} className="cq-si">
-                  <span className="bn-serif" style={{fontWeight:700,minWidth:'1.5em'}}>{sub.l})</span>
-                  <span style={{flex:1}}><MText t={q[sub.k]}/></span>
-                  <span style={{color:'#6b7299',fontSize:'10pt',marginLeft:8,flexShrink:0}}>{sub.m}</span>
-                </div>
-              ):null)}
-            </div>
-          </div>
-        ))}
-      </>}
-
-      {/* SQ */}
+      {/* ── SQ Section — two-column ── */}
       {sqs.length>0&&<>
-        <div className="sec-title">Short Questions <span style={{fontSize:'11pt',fontWeight:400,marginLeft:10}}>[{smk} marks]</span></div>
-        {sqs.map((q,i)=>(
-          <div key={q.id} className="qblock">
-            <div className="qstem"><span style={{marginRight:6}}>{i+1}.</span><MText t={q.stem}/><span style={{fontSize:'10pt',fontWeight:400,color:'#6b7299',marginLeft:8}}>({q.marks})</span></div>
-          </div>
-        ))}
+        <div className="pp-sec bn-serif">
+          {tr.sqSection}
+          <span className="pp-sec-sub">[{lang==='bn'?toBanglaNum(smk):smk} {lang==='bn'?'নম্বর':'marks'}]</span>
+        </div>
+        <div className="sq-two-col">
+          {sqs.map((q,i)=>(
+            <div key={q.id} className="qblock">
+              <div className="qstem bn">
+                <span className="qstem-num">{lang==='bn'?toBanglaNum(i+1):i+1}.</span>
+                <span style={{flex:1}}><MText t={q.stem}/></span>
+                <span className="qmarks">{lang==='bn'?toBanglaNum(q.marks||5):q.marks||5}</span>
+              </div>
+            </div>
+          ))}
+        </div>
       </>}
 
-      {questions.length>0&&<div className="pp-foot bn">— প্রশ্নপত্র সমাপ্ত / End of Question Paper —</div>}
+      {/* ── CQ Section — two-column ── */}
+      {cqs.length>0&&<>
+        <div className="pp-sec bn-serif">
+          {tr.cqSection}
+          <span className="pp-sec-sub">[{lang==='bn'?toBanglaNum(cmk):cmk} {lang==='bn'?'নম্বর':'marks'}]</span>
+        </div>
+        {cqs.length>1?(
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0 20px'}}>
+            {cqs.map((q,i)=><CQPreview key={q.id} q={q} i={i} tr={tr} lang={lang}/>)}
+          </div>
+        ):(
+          cqs.map((q,i)=><CQPreview key={q.id} q={q} i={i} tr={tr} lang={lang}/>)
+        )}
+      </>}
+
+      {questions.length>0&&<div className="pp-foot bn">{tr.foot}</div>}
     </div>
   );
 }
 
-/* Toolbar */
-function Toolbar() {
-  const {s,d} = useApp();
-  const [exp,setExp]=useState(false);
+/* CQ preview sub-component */
+function CQPreview({q,i,tr,lang}){
+  const subMeta=[{k:'subA',l:'ক',le:'a',m:1},{k:'subB',l:'খ',le:'b',m:2},{k:'subC',l:'গ',le:'c',m:3},{k:'subD',l:'ঘ',le:'d',m:4}];
+  return(
+    <div className="qblock">
+      <div className="qstem bn" style={{fontWeight:700}}>
+        <span className="qstem-num">{lang==='bn'?toBanglaNum(i+1):i+1}.</span>
+        <span className="bn-serif">{tr.stimulus}:</span>
+      </div>
+      {q.stimulus&&<div className="cq-stim-box bn"><MText t={q.stimulus}/></div>}
+      {q.diagramImg&&<img src={q.diagramImg} alt="diagram" className="cq-stim-img"/>}
+      <div className="cq-subs bn">
+        {subMeta.map(sub=>q[sub.k]?(
+          <div key={sub.k} className="cq-si">
+            <span className="cq-si-lbl bn-serif">{lang==='bn'?sub.l:sub.le})</span>
+            <span style={{flex:1}}><MText t={q[sub.k]}/></span>
+            <span className="cq-si-marks">{lang==='bn'?toBanglaNum(sub.m):sub.m}</span>
+          </div>
+        ):null)}
+      </div>
+    </div>
+  );
+}
+
+/* Bangla numeral helper */
+function toBanglaNum(n){
+  return String(n).replace(/[0-9]/g,d=>'০১২৩৪৫৬৭৮৯'[d]);
+}
+
+/* Toolbar — with language toggle */
+function Toolbar(){
+  const{s,d}=useApp();
+  const[exp,setExp]=useState(false);
   const notify=(type,msg)=>d({t:'NOTIF',p:{type,msg}});
+  const lang=s.settings.lang||'bn';
 
   const handleExport=async()=>{
-    if (!s.questions.length){notify('warning','Add questions first.');return;}
+    if(!s.questions.length){notify('warning','Add questions first.');return;}
     setExp(true);
     try{await doExport(s.header);notify('success','PDF exported!');}
     catch(e){notify('error',e.message);}
     finally{setExp(false);}
   };
-
   const handlePrint=()=>{
-    if (!s.questions.length){notify('warning','Add questions first.');return;}
+    if(!s.questions.length){notify('warning','Add questions first.');return;}
     window.print();
   };
-
   const clearAll=()=>{
-    if (!s.questions.length) return;
-    if (window.confirm('Clear all questions and header? This cannot be undone.')){
-      d({t:'CLEAR'}); notify('success','Paper cleared.');
-    }
+    if(!s.questions.length)return;
+    if(window.confirm('Clear all questions and header? This cannot be undone.')){d({t:'CLEAR'});notify('success','Paper cleared.');}
   };
 
-  return (
+  return(
     <header className="toolbar">
       <div className="logo-icon">প্র</div>
       <div style={{marginRight:4}}>
         <div className="logo-p">প্রশ্নপত্র বিল্ডার</div>
         <div className="logo-s">SSC / HSC Question Builder</div>
       </div>
-
-      {/* Mobile tab toggle */}
-      <div className="tabbar" style={{flex:1,maxWidth:180}}>
+      {/* Mobile tabs */}
+      <div className="tabbar" style={{flex:1,maxWidth:160}}>
         <button className={'tabbtn'+(s.ui.tab==='editor'?' on':'')} onClick={()=>d({t:'TAB',p:'editor'})}>✏️ Edit</button>
         <button className={'tabbtn'+(s.ui.tab==='preview'?' on':'')} onClick={()=>d({t:'TAB',p:'preview'})}>👁️ Preview</button>
       </div>
-
       <div style={{flex:1}}/>
+      {/* Language toggle */}
+      <div className="lang-tog" title="Switch preview language">
+        <button className={'lang-btn'+(lang==='bn'?' on':'')} onClick={()=>d({t:'SETTINGS',p:{lang:'bn'}})}>বাং</button>
+        <button className={'lang-btn'+(lang==='en'?' on':'')} onClick={()=>d({t:'SETTINGS',p:{lang:'en'}})}>EN</button>
+      </div>
       {s.questions.length>0&&<span className="badge badge-mcq">{s.questions.length} Q</span>}
-      <button className="btn btn-ghost" onClick={handlePrint} title="Print paper">🖨️</button>
+      <button className="btn btn-ghost" onClick={handlePrint} title="Print">🖨️</button>
       <button className="btn btn-primary" onClick={handleExport} disabled={exp}>
         {exp?<span className="spin">⟳</span>:'⬇️'} <span>{exp?'Exporting…':'Export PDF'}</span>
       </button>
@@ -995,68 +861,49 @@ function Toolbar() {
 }
 
 /* App */
-function App() {
-  const {s} = useApp();
-  const tab = s.ui.tab;
-  return (
+function App(){
+  const{s}=useApp();const tab=s.ui.tab;
+  return(
     <div>
       <Toolbar/>
-
-      {/* Hidden PDF target — always in DOM */}
+      {/* Hidden PDF target */}
       <div style={{position:'fixed',top:'-99999px',left:0,width:'794px',visibility:'hidden',zIndex:-1}} aria-hidden="true">
         <Preview forPDF={true}/>
       </div>
-
       <div className="main">
-        {/* Editor column */}
         <div className={'editor-col'+(tab==='preview'?' mob-hide':'')}>
           <HeaderEditor/>
           <ImgUpload/>
           <div>
-            <div className="sec-hdr">
-              Questions
-              {s.questions.length>0&&<span className="badge badge-mcq" style={{marginLeft:8}}>{s.questions.length}</span>}
-            </div>
+            <div className="sec-hdr">Questions{s.questions.length>0&&<span className="badge badge-mcq" style={{marginLeft:8}}>{s.questions.length}</span>}</div>
             <QList/>
           </div>
         </div>
-
-        {/* Preview column */}
         <div className={'preview-col'+(tab==='preview'?' mob-show':'')}>
           <div className="preview-sticky">
             <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
               <div className="sec-hdr" style={{margin:0,flex:1}}>Live Preview</div>
-              <span style={{fontSize:11,color:'#9ca3af'}}>A4 · print ready</span>
+              <span style={{fontSize:11,color:'#9ca3af'}}>A4 · Board standard</span>
             </div>
-            <div className="prev-frame">
-              <Preview/>
-            </div>
+            <div className="prev-frame"><Preview/></div>
           </div>
         </div>
       </div>
-
       <div className="math-hint">
-        💡 Math tip: <code>$x^2 + y^2$</code> for inline math &nbsp;|&nbsp; <code>$$\frac{"{a}"}{"{b}"}$$</code> for block equations
+        💡 Math: <code>$x^2 + y^2$</code> inline &nbsp;|&nbsp; <code>$$\frac{"{a}"}{"{b}"}$$</code> block &nbsp;|&nbsp; বাং/EN toggle switches preview language
       </div>
-
       <Settings/>
       <Toast/>
     </div>
   );
 }
 
-/* Root */
-function Root() {
-  const [s,d] = useReducer(reducer, initState);
-  return (
-    <Ctx.Provider value={{s,d}}>
-      <App/>
-    </Ctx.Provider>
-  );
+function Root(){
+  const[s,d]=useReducer(reducer,initState);
+  return<Ctx.Provider value={{s,d}}><App/></Ctx.Provider>;
 }
-
-const container = document.getElementById('root');
-const root = ReactDOM.createRoot(container);
+const container=document.getElementById('root');
+const root=ReactDOM.createRoot(container);
 root.render(React.createElement(Root));
 </script>
 </body>
