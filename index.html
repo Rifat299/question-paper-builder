@@ -270,7 +270,7 @@ const useApp = () => useContext(Ctx);
    GEMINI API
 ══════════════════════════════════════════════ */
 /* ── Gemini text-only endpoint (much cheaper than vision) ── */
-const GURL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent';
+const GURL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
 /* ── Step 1: Tesseract OCR — runs fully in browser, free, no API ── */
 async function runOCR(file, onProgress) {
