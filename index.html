@@ -91,25 +91,26 @@ body{min-height:100vh}
 .spin{animation:spin 1s linear infinite;display:inline-block}
 
 /* ══ PAPER PREVIEW — Board-standard typography ══ */
+/* Single font stack for entire paper — Noto Serif Bengali for Bangla, Times New Roman for English */
 .pp{
-  font-family:'Noto Serif Bengali','Hind Siliguri',serif;
+  font-family:'Noto Serif Bengali','Times New Roman',Times,serif;
   font-size:10.5pt;line-height:1.75;color:#111;background:#fff;
   padding:8mm 10mm 10mm 10mm;
   width:100%;
 }
 /* Header hierarchy */
-.pp-school{font-size:15pt;font-weight:700;text-align:center;font-family:'Noto Serif Bengali',serif;line-height:1.3;margin-bottom:2px}
-.pp-exam{font-size:12.5pt;font-weight:700;text-align:center;font-family:'Noto Serif Bengali',serif;line-height:1.3;margin-bottom:2px}
-.pp-subject{font-size:11.5pt;font-weight:700;text-align:center;font-family:'Noto Serif Bengali',serif;margin-bottom:4px}
+.pp-school{font-size:15pt;font-weight:700;text-align:center;line-height:1.3;margin-bottom:2px}
+.pp-exam{font-size:12.5pt;font-weight:700;text-align:center;line-height:1.3;margin-bottom:2px}
+.pp-subject{font-size:11.5pt;font-weight:700;text-align:center;margin-bottom:4px}
 /* Meta row — fully justified */
-.pp-meta-row{display:flex;justify-content:space-between;align-items:flex-start;font-size:10.5pt;font-weight:500;margin-top:4px;gap:8px;font-family:'Noto Serif Bengali','Hind Siliguri',sans-serif}
+.pp-meta-row{display:flex;justify-content:space-between;align-items:flex-start;font-size:10.5pt;font-weight:500;margin-top:4px;gap:8px}
 .pp-meta-left{text-align:left;flex:1}
 .pp-meta-right{text-align:right;flex:1}
-.pp-meta-row2{display:flex;justify-content:space-between;font-size:10.5pt;font-family:'Noto Serif Bengali','Hind Siliguri',sans-serif;margin-top:1px}
-.pp-instruction{font-size:9.5pt;line-height:1.6;margin-top:5px;padding:3px 0 5px;border-bottom:1px solid #555;font-family:'Noto Serif Bengali','Hind Siliguri',sans-serif;color:#222}
+.pp-meta-row2{display:flex;justify-content:space-between;font-size:10.5pt;margin-top:1px}
+.pp-instruction{font-size:9.5pt;line-height:1.6;margin-top:5px;padding:3px 0 5px;border-bottom:1px solid #555;color:#222}
 .pp-hdr{border-bottom:2px double #111;padding-bottom:6px;margin-bottom:0}
 /* Section heading — between two rules */
-.pp-sec{font-size:11.5pt;font-weight:700;text-align:center;font-family:'Noto Serif Bengali',serif;
+.pp-sec{font-size:11.5pt;font-weight:700;text-align:center;
   border-top:1.5px solid #333;border-bottom:1.5px solid #333;
   padding:3px 0;margin:10px 0 8px}
 .pp-sec-sub{font-size:9.5pt;font-weight:400;margin-left:8px;color:#444}
@@ -140,7 +141,7 @@ body{min-height:100vh}
 .cq-stim-img{max-width:100%;height:auto;display:block;margin:4px auto;max-height:100px;object-fit:contain}
 .cq-subs{margin-left:16px;font-size:10.5pt}
 .cq-si{display:flex;gap:5px;margin-bottom:2px;line-height:1.75;align-items:flex-start}
-.cq-si-lbl{font-weight:700;min-width:1.5em;flex-shrink:0;font-family:'Noto Serif Bengali',serif}
+.cq-si-lbl{font-weight:700;min-width:1.5em;flex-shrink:0}
 .cq-si-marks{margin-left:auto;flex-shrink:0;padding-left:5px;color:#444;font-size:9.5pt}
 .correct-opt{font-weight:700;color:#15803d}
 .pp-foot{border-top:1px solid #555;margin-top:18px;padding-top:4px;font-size:8.5pt;color:#555;text-align:center}
@@ -728,17 +729,17 @@ function Preview({forPDF}){
 
       {/* ── Board-standard header ── */}
       <div className="pp-hdr">
-        {h.schoolName&&<div className="pp-school bn-serif">{h.schoolName}</div>}
-        {h.examTitle&&<div className="pp-exam bn-serif">{h.examTitle}</div>}
+        {h.schoolName&&<div className="pp-school">{h.schoolName}</div>}
+        {h.examTitle&&<div className="pp-exam">{h.examTitle}</div>}
         {(h.subject||h.subjectCode)&&(
-          <div className="pp-subject bn-serif">
+          <div className="pp-subject">
             {h.subject&&<span>{tr.subject}: {h.subject}</span>}
             {h.subjectCode&&<span style={{marginLeft:12,fontWeight:400,fontSize:'11pt'}}>[{h.subjectCode}]</span>}
           </div>
         )}
         {/* Meta row — time left, marks right */}
         {(h.time||h.totalMarks||h.year)&&(
-          <div className="pp-meta-row bn">
+          <div className="pp-meta-row">
             <div className="pp-meta-left">
               {h.time&&<span><strong>{tr.time}:</strong> {h.time}</span>}
             </div>
@@ -750,13 +751,13 @@ function Preview({forPDF}){
         )}
         {/* Set row */}
         {h.set&&(
-          <div className="pp-meta-row2 bn">
+          <div className="pp-meta-row2">
             <span><strong>{tr.set}:</strong> {h.set}</span>
             <span><strong>{tr.received}:</strong> ____</span>
           </div>
         )}
         {/* Instructions */}
-        {h.instructions&&<div className="pp-instruction bn">{h.instructions}</div>}
+        {h.instructions&&<div className="pp-instruction">{h.instructions}</div>}
       </div>
 
       {/* Empty state */}
@@ -766,14 +767,14 @@ function Preview({forPDF}){
 
       {/* ── MCQ Section — CSS columns, fills left first ── */}
       {mcqs.length>0&&<>
-        <div className="pp-sec bn-serif">
+        <div className="pp-sec">
           {tr.mcqSection}
           <span className="pp-sec-sub">[{lang==='bn'?toBanglaNum(mmk):mmk} {lang==='bn'?'নম্বর':'marks'}]</span>
         </div>
         <div className="pp-two-col">
           {mcqs.map((q,i)=>(
             <div key={q.id} className="qblock">
-              <div className="qstem bn">
+              <div className="qstem">
                 <span className="qstem-num">{lang==='bn'?toBanglaNum(i+1):i+1}.</span>
                 <span style={{flex:1}}><MText t={q.stem}/></span>
                 <span className="qmarks">{lang==='bn'?toBanglaNum(q.marks||1):q.marks||1}</span>
@@ -782,7 +783,7 @@ function Preview({forPDF}){
               <div className="mcq-opts">
                 {['a','b','c','d'].map(k=>(
                   <div key={k} className={'mcq-opt bn'+(sa&&q.correctAnswer===k?' correct-opt':'')}>
-                    <span className="bn-serif" style={{fontWeight:600,flexShrink:0}}>({L[k]})</span>
+                    <span style={{fontWeight:600,flexShrink:0}}>({L[k]})</span>
                     <MText t={q.options?.[k]||''}/>
                     {sa&&q.correctAnswer===k&&<span style={{color:'#15803d',marginLeft:3}}>✓</span>}
                   </div>
@@ -795,14 +796,14 @@ function Preview({forPDF}){
 
       {/* ── SQ Section — two-column ── */}
       {sqs.length>0&&<>
-        <div className="pp-sec bn-serif">
+        <div className="pp-sec">
           {tr.sqSection}
           <span className="pp-sec-sub">[{lang==='bn'?toBanglaNum(smk):smk} {lang==='bn'?'নম্বর':'marks'}]</span>
         </div>
         <div className="sq-two-col">
           {sqs.map((q,i)=>(
             <div key={q.id} className="qblock">
-              <div className="qstem bn">
+              <div className="qstem">
                 <span className="qstem-num">{lang==='bn'?toBanglaNum(i+1):i+1}.</span>
                 <span style={{flex:1}}><MText t={q.stem}/></span>
                 <span className="qmarks">{lang==='bn'?toBanglaNum(q.marks||5):q.marks||5}</span>
@@ -814,7 +815,7 @@ function Preview({forPDF}){
 
       {/* ── CQ Section — two-column ── */}
       {cqs.length>0&&<>
-        <div className="pp-sec bn-serif">
+        <div className="pp-sec">
           {tr.cqSection}
           <span className="pp-sec-sub">[{lang==='bn'?toBanglaNum(cmk):cmk} {lang==='bn'?'নম্বর':'marks'}]</span>
         </div>
@@ -827,7 +828,7 @@ function Preview({forPDF}){
         )}
       </>}
 
-      {questions.length>0&&<div className="pp-foot bn">{tr.foot}</div>}
+      {questions.length>0&&<div className="pp-foot">{tr.foot}</div>}
     </div>
   );
 }
@@ -837,16 +838,16 @@ function CQPreview({q,i,tr,lang}){
   const subMeta=[{k:'subA',l:'ক',le:'a',m:1},{k:'subB',l:'খ',le:'b',m:2},{k:'subC',l:'গ',le:'c',m:3},{k:'subD',l:'ঘ',le:'d',m:4}];
   return(
     <div className="qblock">
-      <div className="qstem bn" style={{fontWeight:700}}>
+      <div className="qstem" style={{fontWeight:700}}>
         <span className="qstem-num">{lang==='bn'?toBanglaNum(i+1):i+1}.</span>
-        <span className="bn-serif">{tr.stimulus}:</span>
+        <span >{tr.stimulus}:</span>
       </div>
-      {q.stimulus&&<div className="cq-stim-box bn"><MText t={q.stimulus}/></div>}
+      {q.stimulus&&<div className="cq-stim-box"><MText t={q.stimulus}/></div>}
       {q.diagramImg&&<img src={q.diagramImg} alt="diagram" className="cq-stim-img"/>}
-      <div className="cq-subs bn">
+      <div className="cq-subs">
         {subMeta.map(sub=>q[sub.k]?(
           <div key={sub.k} className="cq-si">
-            <span className="cq-si-lbl bn-serif">{lang==='bn'?sub.l:sub.le})</span>
+            <span className="cq-si-lbl">{lang==='bn'?sub.l:sub.le})</span>
             <span style={{flex:1}}><MText t={q[sub.k]}/></span>
             <span className="cq-si-marks">{lang==='bn'?toBanglaNum(sub.m):sub.m}</span>
           </div>
