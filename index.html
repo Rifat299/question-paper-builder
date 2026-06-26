@@ -219,9 +219,11 @@ const MText=({t,cls=''})=><span className={cls} dangerouslySetInnerHTML={{__html
 /* ── State ── */
 const makeQ=type=>{
   const base={id:uid(),type};
-  if(type==='mcq')return{...base,stem:'',options:{a:'',b:'',c:'',d:''},correctAnswer:'',marks:1,diagramImg:null};
-  if(type==='cq') return{...base,stimulus:'',subA:'',subB:'',subC:'',subD:'',diagramImg:null};
-  return{...base,stem:'',marks:5};
+  if(type==='mcq')return{...base,stem:'',options:{a:'',b:'',c:'',d:''},correctAnswer:'',marks:1,diagramImg:null,
+    stemEn:'',optionsEn:{a:'',b:'',c:'',d:''},translatedAt:null};
+  if(type==='cq') return{...base,stimulus:'',subA:'',subB:'',subC:'',subD:'',diagramImg:null,
+    stimulusEn:'',subAEn:'',subBEn:'',subCEn:'',subDEn:'',translatedAt:null};
+  return{...base,stem:'',marks:5,stemEn:'',translatedAt:null};
 };
 const defHdr={schoolName:'',examTitle:'',subject:'',subjectCode:'',time:'',totalMarks:'',year:String(new Date().getFullYear()),set:'',instructions:''};
 const initState={
@@ -231,6 +233,7 @@ const initState={
     mcqStyle:(typeof localStorage!=='undefined'&&localStorage.getItem('qpb_mcq'))||'bangla',
     showAns:false,
     lang:'bn',
+    paperMode:'bn', // 'bn' | 'en' — controls which version preview/export shows
   },
   ui:{settingsOpen:false,activeId:null,notif:null,tab:'editor'},
 };
@@ -283,6 +286,41 @@ async function geminiTest(key){
   const res=await fetch(GURL+'?key='+key,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||'Status '+res.status);}
   return true;
+}
+
+/* ── Gemini Translation — Bangla question → English ── */
+async function geminiTranslate(q, key){
+  if(!key) throw new Error('No API key. Open ⚙ Settings first.');
+
+  let content='';
+  if(q.type==='mcq'){
+    content=`Translate this Bangladeshi MCQ exam question from Bangla to English. Return JSON ONLY, no explanation.
+Input:
+{"stem":"${q.stem}","options":{"a":"${q.options?.a||''}","b":"${q.options?.b||''}","c":"${q.options?.c||''}","d":"${q.options?.d||''}"}}
+Output schema (JSON only):
+{"stemEn":"...","optionsEn":{"a":"...","b":"...","c":"...","d":"..."}}
+Rules: keep math expressions as-is ($...$). Translate only Bangla text to natural English.`;
+  } else if(q.type==='cq'){
+    content=`Translate this Bangladeshi Creative Question (সৃজনশীল) from Bangla to English. Return JSON ONLY.
+Input:
+{"stimulus":"${q.stimulus}","subA":"${q.subA||''}","subB":"${q.subB||''}","subC":"${q.subC||''}","subD":"${q.subD||''}"}
+Output schema (JSON only):
+{"stimulusEn":"...","subAEn":"...","subBEn":"...","subCEn":"...","subDEn":"..."}
+Rules: keep math as-is. Translate Bangla to natural English.`;
+  } else {
+    content=`Translate this exam question from Bangla to English. Return JSON ONLY.
+Input: {"stem":"${q.stem}"}
+Output: {"stemEn":"..."}
+Rules: keep math as-is. Translate Bangla to natural English.`;
+  }
+
+  const body={contents:[{parts:[{text:content}]}],generationConfig:{temperature:0.1,maxOutputTokens:1024}};
+  const res=await fetch(GURL+'?key='+key,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||'Gemini error '+res.status);}
+  const data=await res.json();
+  const txt=(data?.candidates?.[0]?.content?.parts?.[0]?.text||'').replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+  try{return JSON.parse(txt);}
+  catch{throw new Error('Translation failed — invalid response. Try again.');}
 }
 
 /* ── PDF Export ── */
@@ -555,6 +593,95 @@ function SQForm({q}){
   );
 }
 
+/* ── English Version Panel — shown inside every QCard ── */
+function EnglishVersionPanel({q}){
+  const{s,d}=useApp();
+  const[loading,setLoad]=useState(false);
+  const[open,setOpen]=useState(!!q.translatedAt);
+  const upd=p=>d({t:'UPD_Q',id:q.id,p});
+
+  const translate=async(e)=>{
+    e.stopPropagation();
+    const key=s.settings.geminiApiKey;
+    if(!key){d({t:'NOTIF',p:{type:'error',msg:'No API key. Open ⚙ Settings first.'}});return;}
+    setLoad(true);
+    try{
+      const result=await geminiTranslate(q,key);
+      upd({...result,translatedAt:Date.now()});
+      setOpen(true);
+      d({t:'NOTIF',p:{type:'success',msg:'Translation done! You can now edit it.'}});
+    }catch(e){
+      d({t:'NOTIF',p:{type:'error',msg:e.message}});
+    }finally{setLoad(false);}
+  };
+
+  const hasTranslation = q.translatedAt || q.stemEn || q.stimulusEn;
+
+  return(
+    <div style={{marginTop:12,borderTop:'1px dashed #e8e5de',paddingTop:10}}>
+      {/* Header row */}
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:open?10:0}}>
+        <span style={{fontSize:11,fontWeight:700,color:'#0f766e',textTransform:'uppercase',letterSpacing:'.05em'}}>🌐 English Version</span>
+        {hasTranslation&&<span style={{fontSize:10,color:'#9ca3af'}}>✓ translated</span>}
+        <div style={{flex:1}}/>
+        <button
+          className="btn btn-sm"
+          style={{fontSize:11,padding:'3px 10px',background:loading?'#f0fdf4':'#ecfdf5',color:'#059669',border:'1px solid #6ee7b7'}}
+          onClick={translate} disabled={loading}
+        >
+          {loading?<><span className="spin">⟳</span> Translating…</>:<>✨ {hasTranslation?'Re-translate':'Translate with AI'}</>}
+        </button>
+        {hasTranslation&&(
+          <button className="btn btn-ghost btn-sm" style={{padding:'3px 7px'}} onClick={e=>{e.stopPropagation();setOpen(v=>!v)}}>
+            {open?'▲':'▼'}
+          </button>
+        )}
+      </div>
+
+      {/* Editable English fields */}
+      {open&&hasTranslation&&(
+        <div style={{display:'flex',flexDirection:'column',gap:8,background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:10,padding:12}}>
+          <p style={{fontSize:10,color:'#15803d',marginBottom:2}}>✏️ Edit the translated text below if needed</p>
+
+          {/* MCQ English fields */}
+          {q.type==='mcq'&&<>
+            <div><label className="lbl" style={{color:'#059669'}}>Question (EN)</label>
+              <textarea className="ta" rows={2} style={{fontSize:12,background:'#fff'}} value={q.stemEn||''} onChange={e=>upd({stemEn:e.target.value})}/>
+            </div>
+            {['a','b','c','d'].map(k=>(
+              <div key={k} style={{display:'flex',gap:6,alignItems:'center'}}>
+                <span style={{width:20,height:20,borderRadius:'50%',background:'#d1fae5',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:700,color:'#059669',flexShrink:0}}>{k}</span>
+                <input className="inp" style={{fontSize:12,background:'#fff'}} placeholder={`Option ${k} (EN)`}
+                  value={q.optionsEn?.[k]||''} onChange={e=>upd({optionsEn:{...q.optionsEn,[k]:e.target.value}})}/>
+              </div>
+            ))}
+          </>}
+
+          {/* CQ English fields */}
+          {q.type==='cq'&&<>
+            <div><label className="lbl" style={{color:'#059669'}}>Stimulus (EN)</label>
+              <textarea className="ta" rows={3} style={{fontSize:12,background:'#fffbeb'}} value={q.stimulusEn||''} onChange={e=>upd({stimulusEn:e.target.value})}/>
+            </div>
+            {[{k:'subAEn',l:'a) Knowledge'},{k:'subBEn',l:'b) Comprehension'},{k:'subCEn',l:'c) Application'},{k:'subDEn',l:'d) Higher-order'}].map(sub=>(
+              <div key={sub.k}>
+                <label className="lbl" style={{color:'#059669',fontSize:10}}>{sub.l}</label>
+                <textarea className="ta" rows={2} style={{fontSize:12,background:'#fff'}} value={q[sub.k]||''} onChange={e=>upd({[sub.k]:e.target.value})}/>
+              </div>
+            ))}
+          </>}
+
+          {/* SQ English fields */}
+          {q.type==='sq'&&(
+            <div><label className="lbl" style={{color:'#059669'}}>Question (EN)</label>
+              <textarea className="ta" rows={3} style={{fontSize:12,background:'#fff'}} value={q.stemEn||''} onChange={e=>upd({stemEn:e.target.value})}/>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* Question card */
 function QCard({q,idx,onDS,onDE,onDEnd}){
   const{s,d}=useApp();
@@ -573,7 +700,12 @@ function QCard({q,idx,onDS,onDE,onDEnd}){
         <button className="btn btn-ghost btn-sm" style={{padding:'3px 7px'}} onClick={e=>{e.stopPropagation();setOpen(v=>!v)}}>{open?'▲':'▼'}</button>
         <button className="btn btn-danger btn-sm" style={{padding:'3px 7px'}} onClick={e=>{e.stopPropagation();d({t:'DEL_Q',id:q.id})}}>🗑</button>
       </div>
-      {open&&<div className="qcard-body">{q.type==='mcq'&&<MCQForm q={q}/>}{q.type==='cq'&&<CQForm q={q}/>}{q.type==='sq'&&<SQForm q={q}/>}</div>}
+      {open&&<div className="qcard-body">
+        {q.type==='mcq'&&<MCQForm q={q}/>}
+        {q.type==='cq'&&<CQForm q={q}/>}
+        {q.type==='sq'&&<SQForm q={q}/>}
+        <EnglishVersionPanel q={q}/>
+      </div>}
     </div>
   );
 }
@@ -714,8 +846,9 @@ function Preview({forPDF}){
   const{s}=useApp();
   const{header:h,questions,settings}=s;
   const lang=settings.lang||'bn';
+  const pm=settings.paperMode||'bn';
   const tr=T[lang];
-  const L=tr.opts;
+  const L=pm==='en'?T.en.opts:tr.opts;
   const sa=settings.showAns;
   const mcqs=questions.filter(q=>q.type==='mcq');
   const cqs=questions.filter(q=>q.type==='cq');
@@ -723,68 +856,52 @@ function Preview({forPDF}){
   const mmk=mcqs.reduce((a,q)=>a+(q.marks||1),0);
   const cmk=cqs.length*10;
   const smk=sqs.reduce((a,q)=>a+(q.marks||5),0);
+  const isEN=pm==='bn'?false:true;
+  const txt=(bn,en)=>isEN?(en||bn||''):(bn||'');
+  const num=n=>isEN?n:(lang==='bn'?toBanglaNum(n):n);
 
   return(
     <div id={forPDF?'pdf-root':undefined} className="pp">
-
-      {/* ── Board-standard header ── */}
       <div className="pp-hdr">
         {h.schoolName&&<div className="pp-school">{h.schoolName}</div>}
         {h.examTitle&&<div className="pp-exam">{h.examTitle}</div>}
         {(h.subject||h.subjectCode)&&(
           <div className="pp-subject">
             {h.subject&&<span>{tr.subject}: {h.subject}</span>}
-            {h.subjectCode&&<span style={{marginLeft:12,fontWeight:400,fontSize:'11pt'}}>[{h.subjectCode}]</span>}
+            {h.subjectCode&&<span style={{marginLeft:12,fontWeight:400,fontSize:'10pt'}}>[{h.subjectCode}]</span>}
           </div>
         )}
-        {/* Meta row — time left, marks right */}
         {(h.time||h.totalMarks||h.year)&&(
           <div className="pp-meta-row">
-            <div className="pp-meta-left">
-              {h.time&&<span><strong>{tr.time}:</strong> {h.time}</span>}
-            </div>
-            <div style={{textAlign:'center',flex:1,color:'#555',fontSize:'10pt'}}>{h.year}</div>
-            <div className="pp-meta-right">
-              {h.totalMarks&&<span><strong>{tr.marks}:</strong> {h.totalMarks}</span>}
-            </div>
+            <div className="pp-meta-left">{h.time&&<span><strong>{tr.time}:</strong> {h.time}</span>}</div>
+            <div style={{textAlign:'center',flex:1,color:'#555',fontSize:'9.5pt'}}>{h.year}</div>
+            <div className="pp-meta-right">{h.totalMarks&&<span><strong>{tr.marks}:</strong> {h.totalMarks}</span>}</div>
           </div>
         )}
-        {/* Set row */}
-        {h.set&&(
-          <div className="pp-meta-row2">
-            <span><strong>{tr.set}:</strong> {h.set}</span>
-            <span><strong>{tr.received}:</strong> ____</span>
-          </div>
-        )}
-        {/* Instructions */}
+        {h.set&&<div className="pp-meta-row2"><span><strong>{tr.set}:</strong> {h.set}</span><span><strong>{tr.received}:</strong> ____</span></div>}
         {h.instructions&&<div className="pp-instruction">{h.instructions}</div>}
       </div>
 
-      {/* Empty state */}
-      {questions.length===0&&(
-        <div className="prev-empty"><div style={{fontSize:36,marginBottom:10}}>📄</div><p style={{fontWeight:600}}>Your paper will appear here</p><p style={{fontSize:12,marginTop:4}}>Add questions in the editor on the left</p></div>
-      )}
+      {isEN&&<div style={{background:'#ecfdf5',border:'1px solid #6ee7b7',borderRadius:6,padding:'3px 10px',fontSize:9.5,color:'#059669',textAlign:'center',margin:'5px 0',fontFamily:'Arial,sans-serif'}}>📄 English Version</div>}
 
-      {/* ── MCQ Section — CSS columns, fills left first ── */}
+      {questions.length===0&&<div className="prev-empty"><div style={{fontSize:36,marginBottom:10}}>📄</div><p style={{fontWeight:600}}>Your paper will appear here</p></div>}
+
       {mcqs.length>0&&<>
-        <div className="pp-sec">
-          {tr.mcqSection}
-          <span className="pp-sec-sub">[{lang==='bn'?toBanglaNum(mmk):mmk} {lang==='bn'?'নম্বর':'marks'}]</span>
-        </div>
+        <div className="pp-sec">{isEN?'Multiple Choice Questions':tr.mcqSection}<span className="pp-sec-sub">[{num(mmk)} {isEN?'marks':lang==='bn'?'নম্বর':'marks'}]</span></div>
         <div className="pp-two-col">
           {mcqs.map((q,i)=>(
             <div key={q.id} className="qblock">
               <div className="qstem">
-                <span className="qstem-num">{lang==='bn'?toBanglaNum(i+1):i+1}.</span>
-                <span style={{flex:1}}><MText t={q.stem}/></span>
-                <span className="qmarks">{lang==='bn'?toBanglaNum(q.marks||1):q.marks||1}</span>
+                <span className="qstem-num">{num(i+1)}.</span>
+                <span style={{flex:1}}><MText t={txt(q.stem,q.stemEn)}/></span>
+                <span className="qmarks">{num(q.marks||1)}</span>
               </div>
               {q.diagramImg&&<img src={q.diagramImg} alt="figure" className="mcq-diag"/>}
               <div className="mcq-opts">
                 {['a','b','c','d'].map(k=>(
-                  <div key={k} className={'mcq-opt bn'+(sa&&q.correctAnswer===k?' correct-opt':'')}>
+                  <div key={k} className={'mcq-opt'+(sa&&q.correctAnswer===k?' correct-opt':'')}>
                     <span style={{fontWeight:600,flexShrink:0}}>({L[k]})</span>
-                    <MText t={q.options?.[k]||''}/>
+                    <MText t={txt(q.options?.[k]||'',q.optionsEn?.[k]||'')}/>
                     {sa&&q.correctAnswer===k&&<span style={{color:'#15803d',marginLeft:3}}>✓</span>}
                   </div>
                 ))}
@@ -794,64 +911,64 @@ function Preview({forPDF}){
         </div>
       </>}
 
-      {/* ── SQ Section — two-column ── */}
       {sqs.length>0&&<>
-        <div className="pp-sec">
-          {tr.sqSection}
-          <span className="pp-sec-sub">[{lang==='bn'?toBanglaNum(smk):smk} {lang==='bn'?'নম্বর':'marks'}]</span>
-        </div>
+        <div className="pp-sec">{isEN?'Short Questions':tr.sqSection}<span className="pp-sec-sub">[{num(smk)} {isEN?'marks':lang==='bn'?'নম্বর':'marks'}]</span></div>
         <div className="sq-two-col">
           {sqs.map((q,i)=>(
             <div key={q.id} className="qblock">
               <div className="qstem">
-                <span className="qstem-num">{lang==='bn'?toBanglaNum(i+1):i+1}.</span>
-                <span style={{flex:1}}><MText t={q.stem}/></span>
-                <span className="qmarks">{lang==='bn'?toBanglaNum(q.marks||5):q.marks||5}</span>
+                <span className="qstem-num">{num(i+1)}.</span>
+                <span style={{flex:1}}><MText t={txt(q.stem,q.stemEn)}/></span>
+                <span className="qmarks">{num(q.marks||5)}</span>
               </div>
             </div>
           ))}
         </div>
       </>}
 
-      {/* ── CQ Section — two-column ── */}
       {cqs.length>0&&<>
-        <div className="pp-sec">
-          {tr.cqSection}
-          <span className="pp-sec-sub">[{lang==='bn'?toBanglaNum(cmk):cmk} {lang==='bn'?'নম্বর':'marks'}]</span>
-        </div>
+        <div className="pp-sec">{isEN?'Creative Questions':tr.cqSection}<span className="pp-sec-sub">[{num(cmk)} {isEN?'marks':lang==='bn'?'নম্বর':'marks'}]</span></div>
         {cqs.length>1?(
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0 20px'}}>
-            {cqs.map((q,i)=><CQPreview key={q.id} q={q} i={i} tr={tr} lang={lang}/>)}
+            {cqs.map((q,i)=><CQPreview key={q.id} q={q} i={i} tr={tr} lang={lang} isEN={isEN} txt={txt} num={num}/>)}
           </div>
         ):(
-          cqs.map((q,i)=><CQPreview key={q.id} q={q} i={i} tr={tr} lang={lang}/>)
+          cqs.map((q,i)=><CQPreview key={q.id} q={q} i={i} tr={tr} lang={lang} isEN={isEN} txt={txt} num={num}/>)
         )}
       </>}
 
-      {questions.length>0&&<div className="pp-foot">{tr.foot}</div>}
+      {questions.length>0&&<div className="pp-foot">{isEN?'— End of Question Paper —':tr.foot}</div>}
     </div>
   );
 }
 
 /* CQ preview sub-component */
-function CQPreview({q,i,tr,lang}){
-  const subMeta=[{k:'subA',l:'ক',le:'a',m:1},{k:'subB',l:'খ',le:'b',m:2},{k:'subC',l:'গ',le:'c',m:3},{k:'subD',l:'ঘ',le:'d',m:4}];
+function CQPreview({q,i,tr,lang,isEN,txt,num}){
+  const subMeta=[
+    {k:'subA',kEn:'subAEn',l:'ক',le:'a',m:1},
+    {k:'subB',kEn:'subBEn',l:'খ',le:'b',m:2},
+    {k:'subC',kEn:'subCEn',l:'গ',le:'c',m:3},
+    {k:'subD',kEn:'subDEn',l:'ঘ',le:'d',m:4}
+  ];
   return(
     <div className="qblock">
       <div className="qstem" style={{fontWeight:700}}>
-        <span className="qstem-num">{lang==='bn'?toBanglaNum(i+1):i+1}.</span>
-        <span >{tr.stimulus}:</span>
+        <span className="qstem-num">{num(i+1)}.</span>
+        <span>{isEN?'Stimulus:':tr.stimulus+':'}</span>
       </div>
-      {q.stimulus&&<div className="cq-stim-box"><MText t={q.stimulus}/></div>}
+      {(q.stimulus||q.stimulusEn)&&<div className="cq-stim-box"><MText t={txt(q.stimulus,q.stimulusEn)}/></div>}
       {q.diagramImg&&<img src={q.diagramImg} alt="diagram" className="cq-stim-img"/>}
       <div className="cq-subs">
-        {subMeta.map(sub=>q[sub.k]?(
-          <div key={sub.k} className="cq-si">
-            <span className="cq-si-lbl">{lang==='bn'?sub.l:sub.le})</span>
-            <span style={{flex:1}}><MText t={q[sub.k]}/></span>
-            <span className="cq-si-marks">{lang==='bn'?toBanglaNum(sub.m):sub.m}</span>
-          </div>
-        ):null)}
+        {subMeta.map(sub=>{
+          const content=txt(q[sub.k],q[sub.kEn]);
+          return content?(
+            <div key={sub.k} className="cq-si">
+              <span className="cq-si-lbl">{isEN?sub.le:lang==='bn'?sub.l:sub.le})</span>
+              <span style={{flex:1}}><MText t={content}/></span>
+              <span className="cq-si-marks">{num(sub.m)}</span>
+            </div>
+          ):null;
+        })}
       </div>
     </div>
   );
@@ -868,6 +985,8 @@ function Toolbar(){
   const[exp,setExp]=useState(false);
   const notify=(type,msg)=>d({t:'NOTIF',p:{type,msg}});
   const lang=s.settings.lang||'bn';
+  const pm=s.settings.paperMode||'bn';
+  const translatedCount=s.questions.filter(q=>q.translatedAt||q.stemEn||q.stimulusEn).length;
 
   const handleExport=async()=>{
     if(!s.questions.length){notify('warning','Add questions first.');return;}
@@ -898,10 +1017,15 @@ function Toolbar(){
         <button className={'tabbtn'+(s.ui.tab==='preview'?' on':'')} onClick={()=>d({t:'TAB',p:'preview'})}>👁️ Preview</button>
       </div>
       <div style={{flex:1}}/>
-      {/* Language toggle */}
-      <div className="lang-tog" title="Switch preview language">
+      {/* Language toggle — UI labels */}
+      <div className="lang-tog" title="Switch preview language labels">
         <button className={'lang-btn'+(lang==='bn'?' on':'')} onClick={()=>d({t:'SETTINGS',p:{lang:'bn'}})}>বাং</button>
         <button className={'lang-btn'+(lang==='en'?' on':'')} onClick={()=>d({t:'SETTINGS',p:{lang:'en'}})}>EN</button>
+      </div>
+      {/* Paper version toggle */}
+      <div className="lang-tog" title="Switch paper version (Bangla / English questions)">
+        <button className={'lang-btn'+(pm==='bn'?' on':'')} style={{color:pm==='bn'?'#1a1d2e':'#6b7299'}} onClick={()=>d({t:'SETTINGS',p:{paperMode:'bn'}})}>📄বাং</button>
+        <button className={'lang-btn'+(pm==='en'?' on':'')} style={{color:pm==='en'?'#059669':'#6b7299',background:pm==='en'?'#d1fae5':undefined}} onClick={()=>d({t:'SETTINGS',p:{paperMode:'en'}})}>📄EN{translatedCount>0?<span style={{fontSize:9,marginLeft:2,background:'#059669',color:'#fff',borderRadius:99,padding:'0 4px'}}>{translatedCount}</span>:null}</button>
       </div>
       {s.questions.length>0&&<span className="badge badge-mcq">{s.questions.length} Q</span>}
       <button className="btn btn-ghost" onClick={handlePrint} title="Print">🖨️</button>
