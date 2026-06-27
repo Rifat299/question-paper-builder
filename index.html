@@ -882,8 +882,6 @@ function Preview({forPDF}){
         {h.instructions&&<div className="pp-instruction">{h.instructions}</div>}
       </div>
 
-      {isEN&&<div style={{background:'#ecfdf5',border:'1px solid #6ee7b7',borderRadius:6,padding:'3px 10px',fontSize:9.5,color:'#059669',textAlign:'center',margin:'5px 0',fontFamily:'Arial,sans-serif'}}>📄 English Version</div>}
-
       {questions.length===0&&<div className="prev-empty"><div style={{fontSize:36,marginBottom:10}}>📄</div><p style={{fontWeight:600}}>Your paper will appear here</p></div>}
 
       {mcqs.length>0&&<>
