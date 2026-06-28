@@ -1,4 +1,4 @@
-# প্রশ্নপত্র বিল্ডার — Question Paper Builder
+# Question Paper Builder
 
 **Live app:** https://rifat299.github.io/question-paper-builder/
 
