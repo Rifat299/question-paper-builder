@@ -294,9 +294,17 @@ function reducer(s,a){
 const Ctx=createContext(null);
 const useApp=()=>useContext(Ctx);
 
-/* ── Gemini Vision ── */
-const GURL='https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+/* ── Claude API helpers ── */
+const CURL='https://api.anthropic.com/v1/messages';
+const CHDRS={'Content-Type':'application/json','x-api-key':'','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'};
 function fileToB64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});}
+async function claudeReq(key,messages,max_tokens=4096){
+  const res=await fetch(CURL,{method:'POST',headers:{...CHDRS,'x-api-key':key},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens,messages})});
+  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||'Claude error '+res.status);}
+  const data=await res.json();
+  return(data?.content?.[0]?.text||'').replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+}
+
 async function geminiVision(file,key){
   if(!key)throw new Error('No API key. Open ⚙ Settings first.');
   const b64=await fileToB64(file),mime=file.type||'image/jpeg';
@@ -306,22 +314,17 @@ MCQ: {"type":"mcq","stem":"...","options":{"a":"...","b":"...","c":"...","d":"..
 CQ:  {"type":"cq","stimulus":"...","subA":"...","subB":"...","subC":"...","subD":"..."}
 SQ:  {"type":"sq","stem":"...","marks":5}
 Rules: preserve Bangla script exactly. Map ক/খ/গ/ঘ options to a/b/c/d. Wrap math in $...$ or $$...$$. Return ONLY a JSON array.`;
-  const body={contents:[{parts:[{text:prompt},{inline_data:{mime_type:mime,data:b64}}]}],generationConfig:{temperature:0.1,maxOutputTokens:4096}};
-  const res=await fetch(GURL+'?key='+key,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||'Gemini error '+res.status);}
-  const data=await res.json();
-  const txt=(data?.candidates?.[0]?.content?.parts?.[0]?.text||'').replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+  const messages=[{role:'user',content:[{type:'image',source:{type:'base64',media_type:mime,data:b64}},{type:'text',text:prompt}]}];
+  const txt=await claudeReq(key,messages,4096);
   try{const arr=JSON.parse(txt);if(!Array.isArray(arr))throw 0;return arr;}
-  catch{throw new Error('Gemini returned invalid JSON. Try a clearer image.');}
+  catch{throw new Error('Claude returned invalid JSON. Try a clearer image.');}
 }
 async function geminiTest(key){
-  const body={contents:[{parts:[{text:'Reply: OK'}]}],generationConfig:{maxOutputTokens:5}};
-  const res=await fetch(GURL+'?key='+key,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||'Status '+res.status);}
+  await claudeReq(key,[{role:'user',content:'Reply: OK'}],5);
   return true;
 }
 
-/* ── Gemini Translation — Bangla question → English ── */
+/* ── Claude Translation — Bangla question → English ── */
 async function geminiTranslate(q, key){
   if(!key) throw new Error('No API key. Open ⚙ Settings first.');
 
@@ -365,11 +368,7 @@ Output: {"stemEn":"..."}
 Additional rules: Translate only Bangla words to natural English.`;
   }
 
-  const body={contents:[{parts:[{text:content}]}],generationConfig:{temperature:0.1,maxOutputTokens:1024}};
-  const res=await fetch(GURL+'?key='+key,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||'Gemini error '+res.status);}
-  const data=await res.json();
-  const txt=(data?.candidates?.[0]?.content?.parts?.[0]?.text||'').replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+  const txt=await claudeReq(key,[{role:'user',content}],1024);
   try{return JSON.parse(txt);}
   catch{throw new Error('Translation failed — invalid response. Try again.');}
 }
@@ -438,12 +437,12 @@ function Settings(){
         <div className="mhead"><span style={{fontWeight:700,fontSize:15}}>⚙️ Settings</span><button className="btn btn-ghost btn-sm" onClick={close}>✕</button></div>
         <div className="mbody">
           <div>
-            <div style={{fontWeight:600,fontSize:13,marginBottom:8}}>🔑 Google Gemini API Key</div>
+            <div style={{fontWeight:600,fontSize:13,marginBottom:8}}>🔑 Anthropic Claude API Key</div>
             <p style={{fontSize:12,color:'#6b7299',marginBottom:10,lineHeight:1.6}}>
-              Needed for AI image extraction. Free key at <a href="https://aistudio.google.com" target="_blank" rel="noreferrer" style={{color:'#4f63f8'}}>aistudio.google.com</a>. Stored only in your browser.
+              Needed for AI image extraction &amp; translation. Get key at <a href="https://console.anthropic.com" target="_blank" rel="noreferrer" style={{color:'#4f63f8'}}>console.anthropic.com</a>. Stored only in your browser.
             </p>
             <div style={{position:'relative'}}>
-              <input type={show?'text':'password'} className="inp" placeholder="AIzaSy..." value={key}
+              <input type={show?'text':'password'} className="inp" placeholder="sk-ant-..." value={key}
                 onChange={e=>{setKey(e.target.value);setTres(null);}} style={{paddingRight:40,fontFamily:'monospace',fontSize:12}}/>
               <button className="btn btn-ghost btn-sm" style={{position:'absolute',right:2,top:'50%',transform:'translateY(-50%)'}} onClick={()=>setShow(v=>!v)}>{show?'🙈':'👁️'}</button>
             </div>
@@ -792,7 +791,7 @@ function QList(){
   );
 }
 
-/* Image upload — 1-step Gemini vision + Ctrl+V paste support */
+/* Image upload — 1-step Claude vision + Ctrl+V paste support */
 function ImgUpload(){
   const{s,d}=useApp();
   const[file,setFile]=useState(null);
@@ -826,9 +825,9 @@ function ImgUpload(){
     <div className="card" style={{padding:18}}>
       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
         <div className="sec-hdr" style={{margin:0}}>AI Image Extraction</div>
-        <span className="badge badge-mcq" style={{fontSize:10}}>Gemini 2.5 Flash</span>
+        <span className="badge badge-mcq" style={{fontSize:10}}>Claude Sonnet</span>
       </div>
-      <p style={{fontSize:12,color:'#6b7299',marginBottom:14,lineHeight:1.6}}>Upload or paste (Ctrl+V) a photo of a question paper → Gemini auto-extracts all questions.</p>
+      <p style={{fontSize:12,color:'#6b7299',marginBottom:14,lineHeight:1.6}}>Upload or paste (Ctrl+V) a photo of a question paper → Claude auto-extracts all questions.</p>
       {!file?(
         <div>
           <div className={'dropzone'+(dov?' dov':'')}
@@ -870,7 +869,7 @@ function ImgUpload(){
           {err&&<div style={{background:'#fef2f2',border:'1px solid #fecaca',borderRadius:8,padding:'8px 12px',fontSize:12,color:'#dc2626',lineHeight:1.6}}>⚠️ {err}</div>}
           {loading&&<div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:'#f0f4ff',border:'1px solid #c7d2fe',borderRadius:8}}>
             <span className="spin" style={{fontSize:18}}>⟳</span>
-            <div><p style={{fontWeight:600,fontSize:12,color:'#3730a3'}}>Gemini analyzing image…</p><p style={{fontSize:11,color:'#6366f1'}}>Reading Bangla text, detecting question types</p></div>
+            <div><p style={{fontWeight:600,fontSize:12,color:'#3730a3'}}>Claude analyzing image…</p><p style={{fontSize:11,color:'#6366f1'}}>Reading Bangla text, detecting question types</p></div>
           </div>}
           {result&&!loading&&<div style={{background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:8,padding:'10px 12px',fontSize:12,color:'#15803d'}}>
             <div style={{fontWeight:700,marginBottom:5}}>✅ Found {result.length} question(s)</div>
@@ -880,12 +879,12 @@ function ImgUpload(){
             </ul>
           </div>}
           <div style={{display:'flex',gap:8}}>
-            {!result&&<button className="btn btn-primary" style={{flex:1}} onClick={extract} disabled={loading}>{loading?<><span className="spin">⟳</span> Analyzing…</>:<>✨ Extract with Gemini</>}</button>}
+            {!result&&<button className="btn btn-primary" style={{flex:1}} onClick={extract} disabled={loading}>{loading?<><span className="spin">⟳</span> Analyzing…</>:<>✨ Extract with Claude</>}</button>}
             {result&&<button className="btn btn-primary" style={{flex:1}} onClick={importAll}>✅ Import {result.length} Question{result.length>1?'s':''}</button>}
             {result&&<button className="btn btn-secondary" onClick={()=>{setRes(null);setErr('');}}>↩ Re-extract</button>}
             <button className="btn btn-secondary" onClick={clear}>Clear</button>
           </div>
-          <p style={{fontSize:10,color:'#9ca3af',textAlign:'center'}}>Free tier: 250 images/day · 10 req/min</p>
+          <p style={{fontSize:10,color:'#9ca3af',textAlign:'center'}}>Powered by Claude Sonnet (claude-sonnet-4-6)</p>
         </div>
       )}
     </div>
