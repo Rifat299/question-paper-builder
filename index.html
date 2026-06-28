@@ -118,7 +118,7 @@ body{min-height:100vh}
 .pp-two-col{
   column-count:2;
   column-gap:14px;
-  column-rule:1px solid #ccc;
+  column-rule:1px solid rgba(0,0,0,0.12);
 }
 /* Question block */
 .qblock{
@@ -135,7 +135,7 @@ body{min-height:100vh}
 /* MCQ diagram */
 .mcq-diag{max-width:100%;height:auto;display:block;margin:4px auto 4px 18px;max-height:90px;object-fit:contain}
 /* SQ two-col via CSS columns */
-.sq-two-col{column-count:2;column-gap:14px;column-rule:1px solid #ccc}
+.sq-two-col{column-count:2;column-gap:14px;column-rule:1px solid rgba(0,0,0,0.12)}
 /* CQ stem */
 .cq-stim-box{margin:3px 0 5px 16px;padding:4px 8px;border-left:2.5px solid #888;font-style:italic;font-size:10.5pt;line-height:1.75}
 .cq-stim-img{max-width:100%;height:auto;display:block;margin:4px auto;max-height:100px;object-fit:contain}
@@ -162,13 +162,23 @@ body{min-height:100vh}
   .pp-two-col,.sq-two-col{column-count:1}
 }
 @media print{
-  .toolbar,.math-hint,.moverlay,.notif{display:none!important}
-  .main{display:block;padding:0}
-  .editor-col{display:none!important}
-  .preview-col{display:block!important}
-  .prev-frame{box-shadow:none;border:none;max-height:none;overflow:visible}
-  .pp{padding:8mm 10mm}
-  .pp-two-col{column-gap:12px}
+  /* Hide chrome */
+  .toolbar,.math-hint,.moverlay,.notif,.editor-col{display:none!important}
+  /* Layout reset */
+  .main{display:block!important;padding:0!important;margin:0!important;max-width:none!important}
+  .preview-col{display:block!important;width:100%!important}
+  /* Strip preview frame decoration */
+  .preview-sticky{position:static!important}
+  .preview-sticky > div:first-child{display:none!important}
+  .prev-frame{box-shadow:none!important;border:none!important;border-radius:0!important;max-height:none!important;overflow:visible!important;background:transparent!important}
+  /* Paper */
+  .pp{padding:10mm 12mm!important;background:#fff!important;width:100%!important}
+  /* Force two-column */
+  .pp-two-col{column-count:2!important;column-gap:12px!important;column-rule:1px solid rgba(0,0,0,0.12)!important;column-fill:balance!important;overflow:visible!important;display:block!important}
+  .sq-two-col{column-count:2!important;column-gap:12px!important;column-rule:1px solid rgba(0,0,0,0.12)!important;column-fill:balance!important;overflow:visible!important;display:block!important}
+  .qblock{break-inside:avoid!important;page-break-inside:avoid!important;overflow:hidden!important}
+  .mcq-opts{break-inside:avoid!important;page-break-inside:avoid!important;display:grid!important;grid-template-columns:1fr 1fr!important}
+  @page{margin:0}
 }
 </style>
 </head>
@@ -182,14 +192,14 @@ const T = {
   bn: {
     mcqSection:'বহুনির্বাচনি প্রশ্ন',sqSection:'সংক্ষিপ্ত প্রশ্ন',cqSection:'সৃজনশীল প্রশ্ন',
     time:'সময়',marks:'পূর্ণমান',subject:'বিষয়',set:'সেট',received:'প্রাপ্ত নম্বর',
-    stimulus:'উদ্দীপক',foot:'— প্রশ্নপত্র সমাপ্ত —',
+    stimulus:'উদ্দীপক',foot:'— প্রশ্নপত্র সমাপ্ত — শুভকামনা। @mrh.du26',
     opts:{a:'ক',b:'খ',c:'গ',d:'ঘ'},
     markNum:n=>['০','১','২','৩','৪','৫','৬','৭','৮','৯'].reduce((s,d,i)=>s.replace(new RegExp(i,'g'),d),String(n)),
   },
   en: {
     mcqSection:'Multiple Choice Questions',sqSection:'Short Questions',cqSection:'Creative Questions',
     time:'Time',marks:'Total Marks',subject:'Subject',set:'Set',received:'Marks Obtained',
-    stimulus:'Stimulus',foot:'— End of Question Paper —',
+    stimulus:'Stimulus',foot:'— The End. Best of Luck. @mrh.du26',
     opts:{a:'a',b:'b',c:'c',d:'d'},
     markNum:n=>String(n),
   }
@@ -933,7 +943,6 @@ function Preview({forPDF}){
               <div className="qstem">
                 <span className="qstem-num">{num(i+1)}.</span>
                 <span style={{flex:1}}><SmartMText t={txt(q.stem,q.stemEn)}/></span>
-                <span className="qmarks">{num(q.marks||1)}</span>
               </div>
               {q.diagramImg&&<img src={q.diagramImg} alt="figure" className="mcq-diag"/>}
               <div className="mcq-opts">
@@ -976,7 +985,7 @@ function Preview({forPDF}){
         )}
       </>}
 
-      {questions.length>0&&<div className="pp-foot">{isEN?'— End of Question Paper —':tr.foot}</div>}
+      {questions.length>0&&<div className="pp-foot">{tr.foot}</div>}
     </div>
   );
 }
