@@ -262,7 +262,7 @@ const defHdr={schoolName:'',examTitle:'',subject:'',subjectCode:'',time:'',total
 const initState={
   header:defHdr,questions:[],
   settings:{
-    geminiApiKey:(typeof localStorage!=='undefined'&&localStorage.getItem('qpb_key'))||'',
+    apiKey:(typeof localStorage!=='undefined'&&localStorage.getItem('qpb_orkey'))||'',
     mcqStyle:(typeof localStorage!=='undefined'&&localStorage.getItem('qpb_mcq'))||'bangla',
     showAns:false,
     lang:'bn',
@@ -280,9 +280,7 @@ function reducer(s,a){
     case 'IMPORT':{const qs=a.p.map(q=>({...makeQ(q.type||'sq'),...q,id:uid()}));return{...s,questions:[...s.questions,...qs]};}
     case 'CLEAR':   return{...s,questions:[],header:defHdr};
     case 'SETTINGS':return{...s,settings:{...s.settings,...a.p}};
-    case 'SAVE_KEY':
-      try{localStorage.setItem('qpb_key',a.p);localStorage.setItem('qpb_mcq',s.settings.mcqStyle);}catch(e){}
-      return{...s,settings:{...s.settings,geminiApiKey:a.p}};
+    case 'SAVE_KEY': return s; // deprecated
     case 'NOTIF':   return{...s,ui:{...s.ui,notif:a.p}};
     case 'CLRN':    return{...s,ui:{...s.ui,notif:null}};
     case 'ACTIVE':  return{...s,ui:{...s.ui,activeId:a.p}};
@@ -294,19 +292,37 @@ function reducer(s,a){
 const Ctx=createContext(null);
 const useApp=()=>useContext(Ctx);
 
-/* ── Claude API helpers ── */
-const CURL='https://api.anthropic.com/v1/messages';
-const CHDRS={'Content-Type':'application/json','x-api-key':'','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'};
+/* ── Claude Vision + Translation ── */
+const OR_URL='https://openrouter.ai/api/v1/chat/completions';
+const VISION_MODELS=[
+  'google/gemma-4-31b-it:free',
+  'google/gemma-4-26b-a4b-it:free',
+  'nvidia/nemotron-nano-12b-v2-vl:free',
+  'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free'
+];
+const TEXT_MODEL='openrouter/free';
 function fileToB64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});}
-async function claudeReq(key,messages,max_tokens=4096){
-  const res=await fetch(CURL,{method:'POST',headers:{...CHDRS,'x-api-key':key},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens,messages})});
-  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||'Claude error '+res.status);}
+
+async function claudeCall(messages, maxTokens=4096, apiKey='', model=TEXT_MODEL){
+  const orMsgs=messages.map(m=>{
+    if(typeof m.content==='string') return{role:m.role,content:m.content};
+    return{role:m.role,content:m.content.map(p=>{
+      if(p.type==='text') return{type:'text',text:p.text};
+      if(p.type==='image') return{type:'image_url',image_url:{url:'data:'+p.source.media_type+';base64,'+p.source.data}};
+      return null;
+    }).filter(Boolean)};
+  });
+  const res=await fetch(OR_URL,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey,'HTTP-Referer':'https://github.com','X-Title':'Question Builder'},
+    body:JSON.stringify({model,max_tokens:maxTokens,messages:orMsgs})
+  });
+  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||'API error '+res.status);}
   const data=await res.json();
-  return(data?.content?.[0]?.text||'').replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+  return(data?.choices?.[0]?.message?.content||'').replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
 }
 
 async function geminiVision(file,key){
-  if(!key)throw new Error('No API key. Open ⚙ Settings first.');
   const b64=await fileToB64(file),mime=file.type||'image/jpeg';
   const prompt=`You are an expert at reading Bangladeshi SSC/HSC exam papers. Extract ALL questions from this image as a JSON array ONLY — no markdown fences, no explanation.
 Schema:
@@ -314,20 +330,34 @@ MCQ: {"type":"mcq","stem":"...","options":{"a":"...","b":"...","c":"...","d":"..
 CQ:  {"type":"cq","stimulus":"...","subA":"...","subB":"...","subC":"...","subD":"..."}
 SQ:  {"type":"sq","stem":"...","marks":5}
 Rules: preserve Bangla script exactly. Map ক/খ/গ/ঘ options to a/b/c/d. Wrap math in $...$ or $$...$$. Return ONLY a JSON array.`;
-  const messages=[{role:'user',content:[{type:'image',source:{type:'base64',media_type:mime,data:b64}},{type:'text',text:prompt}]}];
-  const txt=await claudeReq(key,messages,4096);
-  try{const arr=JSON.parse(txt);if(!Array.isArray(arr))throw 0;return arr;}
-  catch{throw new Error('Claude returned invalid JSON. Try a clearer image.');}
+  function extractJSON(s){
+    s=s.replace(/```json\n?/gi,'').replace(/```\n?/g,'');
+    try{const a=JSON.parse(s.trim());if(Array.isArray(a))return a;}catch(e){}
+    const start=s.indexOf('['),end=s.lastIndexOf(']');
+    if(start!==-1&&end>start){try{const a=JSON.parse(s.slice(start,end+1));if(Array.isArray(a))return a;}catch(e){}}
+    return null;
+  }
+  const msgs=[{role:'user',content:[{type:'image',source:{type:'base64',media_type:mime,data:b64}},{type:'text',text:prompt}]}];
+  let arr=null,lastRaw='';
+  for(const model of VISION_MODELS){
+    try{
+      const txt=await claudeCall(msgs,4096,key,model);
+      lastRaw=txt;
+      arr=extractJSON(txt);
+      if(arr&&arr.length) break;
+    }catch(e){lastRaw=e.message;}
+  }
+  if(!arr||!arr.length) throw new Error('All vision models failed. Last: '+lastRaw.slice(0,150));
+  return arr;
 }
+
 async function geminiTest(key){
-  await claudeReq(key,[{role:'user',content:'Reply: OK'}],5);
+  await claudeCall([{role:'user',content:'Reply: OK'}],10,key,TEXT_MODEL);
   return true;
 }
 
 /* ── Claude Translation — Bangla question → English ── */
 async function geminiTranslate(q, key){
-  if(!key) throw new Error('No API key. Open ⚙ Settings first.');
-
   const LATEX_RULE=`CRITICAL RULE — LATEX PROTECTION: Identify every mathematical expression wrapped inside single dollar signs ($...$) or double dollar signs ($$...$$). Treat ALL such expressions as strictly READ-ONLY. Do NOT translate them, do NOT modify any characters inside them, do NOT adjust spaces, do NOT remove or alter the dollar sign delimiters, do NOT escape or add backslashes. Copy them byte-for-byte identical to the original. This rule overrides everything else.`;
 
   let content='';
@@ -368,9 +398,15 @@ Output: {"stemEn":"..."}
 Additional rules: Translate only Bangla words to natural English.`;
   }
 
-  const txt=await claudeReq(key,[{role:'user',content}],1024);
-  try{return JSON.parse(txt);}
-  catch{throw new Error('Translation failed — invalid response. Try again.');}
+  const txt=await claudeCall([{role:'user',content}],1024,key);
+  try{
+    const s=txt.replace(/```json\n?/gi,'').replace(/```\n?/g,'').trim();
+    // try direct, then find first {...}
+    try{return JSON.parse(s);}catch(e){}
+    const start=s.indexOf('{');const end=s.lastIndexOf('}');
+    if(start!==-1&&end>start) return JSON.parse(s.slice(start,end+1));
+    throw new Error('no json');
+  }catch{throw new Error('Translation failed. Try again.');}
 }
 
 /* ── PDF Export ── */
@@ -413,21 +449,19 @@ function Toast(){
 function Settings(){
   const{s,d}=useApp();
   if(!s.ui.settingsOpen)return null;
-  const[key,setKey]=useState(s.settings.geminiApiKey);
-  const[show,setShow]=useState(false);
   const[testing,setTesting]=useState(false);
   const[tres,setTres]=useState(null);
   const[tmsg,setTmsg]=useState('');
   const close=()=>d({t:'SETOPEN',p:false});
   const save=()=>{
-    d({t:'SAVE_KEY',p:key.trim()});
-    d({t:'SETTINGS',p:{mcqStyle:s.settings.mcqStyle,showAns:s.settings.showAns}});
-    try{localStorage.setItem('qpb_mcq',s.settings.mcqStyle);}catch(e){}
+    d({t:'SETTINGS',p:{mcqStyle:s.settings.mcqStyle,showAns:s.settings.showAns,apiKey:s.settings.apiKey}});
+    try{localStorage.setItem('qpb_mcq',s.settings.mcqStyle);localStorage.setItem('qpb_orkey',s.settings.apiKey||'');}catch(e){}
     d({t:'NOTIF',p:{type:'success',msg:'Settings saved!'}});close();
   };
   const test=async()=>{
-    if(!key.trim())return;setTesting(true);setTres(null);
-    try{await geminiTest(key.trim());setTres('ok');setTmsg('API key works! ✓');}
+    if(!s.settings.apiKey){setTres('fail');setTmsg('Enter API key first.');return;}
+    setTesting(true);setTres(null);
+    try{await geminiTest(s.settings.apiKey);setTres('ok');setTmsg('OpenRouter works! ✓');}
     catch(e){setTres('fail');setTmsg(e.message);}
     finally{setTesting(false);}
   };
@@ -437,17 +471,14 @@ function Settings(){
         <div className="mhead"><span style={{fontWeight:700,fontSize:15}}>⚙️ Settings</span><button className="btn btn-ghost btn-sm" onClick={close}>✕</button></div>
         <div className="mbody">
           <div>
-            <div style={{fontWeight:600,fontSize:13,marginBottom:8}}>🔑 Anthropic Claude API Key</div>
-            <p style={{fontSize:12,color:'#6b7299',marginBottom:10,lineHeight:1.6}}>
-              Needed for AI image extraction &amp; translation. Get key at <a href="https://console.anthropic.com" target="_blank" rel="noreferrer" style={{color:'#4f63f8'}}>console.anthropic.com</a>. Stored only in your browser.
-            </p>
-            <div style={{position:'relative'}}>
-              <input type={show?'text':'password'} className="inp" placeholder="sk-ant-..." value={key}
-                onChange={e=>{setKey(e.target.value);setTres(null);}} style={{paddingRight:40,fontFamily:'monospace',fontSize:12}}/>
-              <button className="btn btn-ghost btn-sm" style={{position:'absolute',right:2,top:'50%',transform:'translateY(-50%)'}} onClick={()=>setShow(v=>!v)}>{show?'🙈':'👁️'}</button>
+            <div style={{fontWeight:600,fontSize:13,marginBottom:8}}>🤖 AI Provider</div>
+            <div style={{marginBottom:10}}>
+              <label className="lbl">OpenRouter API Key (free)</label>
+              <input className="inp" type="password" placeholder="sk-or-v1-..." value={s.settings.apiKey||''} onChange={e=>d({t:'SETTINGS',p:{apiKey:e.target.value}})}/>
+              <p style={{fontSize:11,color:'#6b7299',marginTop:4}}>Get your key at <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" style={{color:'#4f63f8'}}>openrouter.ai/keys</a>. Saved locally.</p>
             </div>
-            {tres&&<div style={{marginTop:8,padding:'7px 11px',borderRadius:8,fontSize:12,background:tres==='ok'?'#f0fdf4':'#fef2f2',color:tres==='ok'?'#15803d':'#dc2626',border:'1px solid '+(tres==='ok'?'#bbf7d0':'#fecaca')}}>{tmsg}</div>}
-            <button className="btn btn-secondary btn-sm" style={{marginTop:8}} onClick={test} disabled={!key.trim()||testing}>{testing?<span className="spin">⟳</span>:null} Test Key</button>
+            <button className="btn btn-secondary btn-sm" onClick={test} disabled={testing}>{testing?<span className="spin">⟳</span>:'🔬'} Test Connection</button>
+            {tres&&<p style={{fontSize:12,marginTop:6,color:tres==='ok'?'#15803d':'#dc2626'}}>{tmsg}</p>}
           </div>
           <div>
             <div style={{fontWeight:600,fontSize:13,marginBottom:10}}>MCQ Option Labels</div>
@@ -652,11 +683,11 @@ function EnglishVersionPanel({q}){
 
   const translate=async(e)=>{
     e.stopPropagation();
-    const key=s.settings.geminiApiKey;
-    if(!key){d({t:'NOTIF',p:{type:'error',msg:'No API key. Open ⚙ Settings first.'}});return;}
+    const apiKey=s.settings.apiKey||'';
+    if(!apiKey){d({t:'NOTIF',p:{type:'error',msg:'API key required. Add it in ⚙️ Settings.'}});return;}
     setLoad(true);
     try{
-      const result=await geminiTranslate(q,key);
+      const result=await geminiTranslate(q,apiKey);
       upd({...result,translatedAt:Date.now()});
       setOpen(true);
       d({t:'NOTIF',p:{type:'success',msg:'Translation done! You can now edit it.'}});
@@ -801,6 +832,7 @@ function ImgUpload(){
   const[err,setErr]=useState('');
   const[dov,setDov]=useState(false);
   const ref=useRef();
+  const apiKey=s.settings.apiKey||'';
 
   const pick=files=>{
     const f=files&&files[0];if(!f)return;
@@ -808,8 +840,9 @@ function ImgUpload(){
   };
 
   const extract=async()=>{
+    if(!apiKey){setErr('API key required. Add it in ⚙️ Settings.');return;}
     setLoad(true);setErr('');
-    try{const qs=await geminiVision(file,s.settings.geminiApiKey);setRes(qs);}
+    try{const qs=await geminiVision(file,apiKey);setRes(qs);}
     catch(e){setErr(e.message);}
     finally{setLoad(false);}
   };
@@ -825,9 +858,9 @@ function ImgUpload(){
     <div className="card" style={{padding:18}}>
       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
         <div className="sec-hdr" style={{margin:0}}>AI Image Extraction</div>
-        <span className="badge badge-mcq" style={{fontSize:10}}>Claude Sonnet</span>
+        <span className="badge badge-mcq" style={{fontSize:10}}>Gemini 2.0 Flash</span>
       </div>
-      <p style={{fontSize:12,color:'#6b7299',marginBottom:14,lineHeight:1.6}}>Upload or paste (Ctrl+V) a photo of a question paper → Claude auto-extracts all questions.</p>
+      <p style={{fontSize:12,color:'#6b7299',marginBottom:14,lineHeight:1.6}}>Upload or paste (Ctrl+V) a photo of a question paper → Gemini auto-extracts all questions.</p>
       {!file?(
         <div>
           <div className={'dropzone'+(dov?' dov':'')}
@@ -869,7 +902,7 @@ function ImgUpload(){
           {err&&<div style={{background:'#fef2f2',border:'1px solid #fecaca',borderRadius:8,padding:'8px 12px',fontSize:12,color:'#dc2626',lineHeight:1.6}}>⚠️ {err}</div>}
           {loading&&<div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:'#f0f4ff',border:'1px solid #c7d2fe',borderRadius:8}}>
             <span className="spin" style={{fontSize:18}}>⟳</span>
-            <div><p style={{fontWeight:600,fontSize:12,color:'#3730a3'}}>Claude analyzing image…</p><p style={{fontSize:11,color:'#6366f1'}}>Reading Bangla text, detecting question types</p></div>
+            <div><p style={{fontWeight:600,fontSize:12,color:'#3730a3'}}>Gemini analyzing image…</p><p style={{fontSize:11,color:'#6366f1'}}>Reading Bangla text, detecting question types</p></div>
           </div>}
           {result&&!loading&&<div style={{background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:8,padding:'10px 12px',fontSize:12,color:'#15803d'}}>
             <div style={{fontWeight:700,marginBottom:5}}>✅ Found {result.length} question(s)</div>
@@ -879,12 +912,12 @@ function ImgUpload(){
             </ul>
           </div>}
           <div style={{display:'flex',gap:8}}>
-            {!result&&<button className="btn btn-primary" style={{flex:1}} onClick={extract} disabled={loading}>{loading?<><span className="spin">⟳</span> Analyzing…</>:<>✨ Extract with Claude</>}</button>}
+            {!result&&<button className="btn btn-primary" style={{flex:1}} onClick={extract} disabled={loading}>{loading?<><span className="spin">⟳</span> Analyzing…</>:<>✨ Extract with Gemini</>}</button>}
             {result&&<button className="btn btn-primary" style={{flex:1}} onClick={importAll}>✅ Import {result.length} Question{result.length>1?'s':''}</button>}
             {result&&<button className="btn btn-secondary" onClick={()=>{setRes(null);setErr('');}}>↩ Re-extract</button>}
             <button className="btn btn-secondary" onClick={clear}>Clear</button>
           </div>
-          <p style={{fontSize:10,color:'#9ca3af',textAlign:'center'}}>Powered by Claude Sonnet (claude-sonnet-4-6)</p>
+          <p style={{fontSize:10,color:'#9ca3af',textAlign:'center'}}>Powered by Claude AI (claude-sonnet-4-6)</p>
         </div>
       )}
     </div>
