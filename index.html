@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>প্রশ্নপত্র বিল্ডার | Question Paper Builder</title>
+<title>Question Paper Builder</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Bengali:wght@400;500;600;700&family=Hind+Siliguri:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
@@ -11,8 +11,6 @@
 <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.23.9/babel.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html{font-family:'Inter','Hind Siliguri',sans-serif;-webkit-font-smoothing:antialiased;background:#f5f3ee}
@@ -107,7 +105,7 @@ body{min-height:100vh}
 .pp-meta-left{text-align:left;flex:1}
 .pp-meta-right{text-align:right;flex:1}
 .pp-meta-row2{display:flex;justify-content:space-between;font-size:10.5pt;margin-top:1px}
-.pp-instruction{font-size:9.5pt;line-height:1.6;margin-top:5px;padding:3px 0 5px;border-bottom:1px solid #555;color:#222}
+.pp-instruction{font-size:8.5pt;font-style:italic;line-height:1.6;margin-top:5px;padding:3px 0 5px;border-bottom:1px solid #555;color:#222}
 .pp-hdr{border-bottom:2px double #111;padding-bottom:6px;margin-bottom:0}
 /* Section heading — between two rules */
 .pp-sec{font-size:11.5pt;font-weight:700;text-align:center;
@@ -124,7 +122,7 @@ body{min-height:100vh}
 .qblock{
   break-inside:avoid;
   page-break-inside:avoid;
-  margin-bottom:8px;
+  margin-bottom:14px;
 }
 .qstem{font-size:10.5pt;line-height:1.75;margin-bottom:3px;display:flex;gap:3px;align-items:flex-start}
 .qstem-num{flex-shrink:0;font-weight:600;min-width:1.5em}
@@ -137,7 +135,7 @@ body{min-height:100vh}
 /* SQ two-col via CSS columns */
 .sq-two-col{column-count:2;column-gap:14px;column-rule:1px solid rgba(0,0,0,0.12)}
 /* CQ stem */
-.cq-stim-box{margin:3px 0 5px 16px;padding:4px 8px;border-left:2.5px solid #888;font-style:italic;font-size:10.5pt;line-height:1.75}
+.cq-stim-box{margin:0 0 5px 0;font-size:10.5pt;line-height:1.75}
 .cq-stim-img{max-width:100%;height:auto;display:block;margin:4px auto;max-height:100px;object-fit:contain}
 .cq-subs{margin-left:16px;font-size:10.5pt}
 .cq-si{display:flex;gap:5px;margin-bottom:2px;line-height:1.75;align-items:flex-start}
@@ -258,11 +256,11 @@ const makeQ=type=>{
     stimulusEn:'',subAEn:'',subBEn:'',subCEn:'',subDEn:'',translatedAt:null};
   return{...base,stem:'',marks:5,stemEn:'',translatedAt:null};
 };
-const defHdr={schoolName:'',examTitle:'',subject:'',subjectCode:'',time:'',totalMarks:'',year:String(new Date().getFullYear()),set:'',instructions:''};
+const defHdr={schoolName:'',examTitle:'',subject:'',subjectCode:'',time:'',totalMarks:'',year:'',set:'',instructions:'দ্রষ্টব্যঃ সরবরাহকৃত নৈর্ব্যত্তিক অভীক্ষার উত্তরপত্রে প্রশ্নের ক্রমিক নম্বরের বিপরীতে প্রদত্ত বর্ণসম্বলিত বৃত্ত সমুহ হতে সঠিক উত্তরের বৃত্তটি বল পয়েন্ট কলম দ্বারা সম্পুর্ণ ভরাট করো । প্রতিটি প্রশ্নের মান ১।\nপ্রশ্নপত্রে কোনো প্রকার দাগ/চিহ্ন দেয়া যাবেনা ।',instructionsEn:"Note: For each question, fully shade the circle corresponding to the correct answer using a ballpoint pen, matching the question's serial number. Each question carries 1 mark.\nNo marks or stray marks are allowed on the question paper."};
 const initState={
   header:defHdr,questions:[],
   settings:{
-    apiKey:(typeof localStorage!=='undefined'&&localStorage.getItem('qpb_orkey'))||'',
+    apiKey:(typeof localStorage!=='undefined'&&localStorage.getItem('qpb_apikey'))||'',
     mcqStyle:(typeof localStorage!=='undefined'&&localStorage.getItem('qpb_mcq'))||'bangla',
     showAns:false,
     lang:'bn',
@@ -292,35 +290,22 @@ function reducer(s,a){
 const Ctx=createContext(null);
 const useApp=()=>useContext(Ctx);
 
-/* ── Claude Vision + Translation ── */
-const OR_URL='https://openrouter.ai/api/v1/chat/completions';
-const VISION_MODELS=[
-  'google/gemma-4-31b-it:free',
-  'google/gemma-4-26b-a4b-it:free',
-  'nvidia/nemotron-nano-12b-v2-vl:free',
-  'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free'
-];
-const TEXT_MODEL='openrouter/free';
+/* ── Mistral Vision + Translation ── */
+const MISTRAL_URL='https://api.mistral.ai/v1/chat/completions';
+const MISTRAL_VISION_MODEL='pixtral-12b-2409';
+const MISTRAL_TEXT_MODEL='mistral-small-latest';
 function fileToB64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});}
 
-async function claudeCall(messages, maxTokens=4096, apiKey='', model=TEXT_MODEL){
-  const orMsgs=messages.map(m=>{
-    if(typeof m.content==='string') return{role:m.role,content:m.content};
-    return{role:m.role,content:m.content.map(p=>{
-      if(p.type==='text') return{type:'text',text:p.text};
-      if(p.type==='image') return{type:'image_url',image_url:{url:'data:'+p.source.media_type+';base64,'+p.source.data}};
-      return null;
-    }).filter(Boolean)};
-  });
-  const res=await fetch(OR_URL,{
-    method:'POST',
-    headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey,'HTTP-Referer':'https://github.com','X-Title':'Question Builder'},
-    body:JSON.stringify({model,max_tokens:maxTokens,messages:orMsgs})
-  });
-  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||'API error '+res.status);}
+async function mistralCall(messages, maxTokens=1024, apiKey='', isVision=false){
+  const body={model:isVision?MISTRAL_VISION_MODEL:MISTRAL_TEXT_MODEL,messages,max_tokens:maxTokens};
+  if(!isVision) body.response_format={type:'json_object'};
+  const res=await fetch(MISTRAL_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},body:JSON.stringify(body)});
+  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.message||'Mistral error '+res.status);}
   const data=await res.json();
-  return(data?.choices?.[0]?.message?.content||'').replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+  return(data?.choices?.[0]?.message?.content||'').replace(/```json\n?/gi,'').replace(/```\n?/g,'').trim();
 }
+// alias kept so geminiVision/geminiTranslate calls work unchanged
+const claudeCall=(msgs,maxTokens,apiKey,isVision)=>mistralCall(msgs,maxTokens,apiKey,isVision);
 
 async function geminiVision(file,key){
   const b64=await fileToB64(file),mime=file.type||'image/jpeg';
@@ -337,22 +322,18 @@ Rules: preserve Bangla script exactly. Map ক/খ/গ/ঘ options to a/b/c/d. W
     if(start!==-1&&end>start){try{const a=JSON.parse(s.slice(start,end+1));if(Array.isArray(a))return a;}catch(e){}}
     return null;
   }
-  const msgs=[{role:'user',content:[{type:'image',source:{type:'base64',media_type:mime,data:b64}},{type:'text',text:prompt}]}];
+  const msgs=[{role:'user',content:[{type:'image_url',image_url:{url:`data:${mime};base64,${b64}`}},{type:'text',text:prompt}]}];
   let arr=null,lastRaw='';
-  for(const model of VISION_MODELS){
-    try{
-      const txt=await claudeCall(msgs,4096,key,model);
-      lastRaw=txt;
-      arr=extractJSON(txt);
-      if(arr&&arr.length) break;
-    }catch(e){lastRaw=e.message;}
-  }
-  if(!arr||!arr.length) throw new Error('All vision models failed. Last: '+lastRaw.slice(0,150));
+  try{
+    const txt=await claudeCall(msgs,4096,key,true);
+    lastRaw=txt;arr=extractJSON(txt);
+  }catch(e){lastRaw=e.message;}
+  if(!arr||!arr.length) throw new Error('Extraction failed: '+lastRaw.slice(0,150));
   return arr;
 }
 
 async function geminiTest(key){
-  await claudeCall([{role:'user',content:'Reply: OK'}],10,key,TEXT_MODEL);
+  await mistralCall([{role:'user',content:'Reply: OK'}],10,key,false);
   return true;
 }
 
@@ -398,7 +379,7 @@ Output: {"stemEn":"..."}
 Additional rules: Translate only Bangla words to natural English.`;
   }
 
-  const txt=await claudeCall([{role:'user',content}],1024,key);
+  const txt=await claudeCall([{role:'user',content}],1024,key,false);
   try{
     const s=txt.replace(/```json\n?/gi,'').replace(/```\n?/g,'').trim();
     // try direct, then find first {...}
@@ -407,32 +388,6 @@ Additional rules: Translate only Bangla words to natural English.`;
     if(start!==-1&&end>start) return JSON.parse(s.slice(start,end+1));
     throw new Error('no json');
   }catch{throw new Error('Translation failed. Try again.');}
-}
-
-/* ── PDF Export ── */
-async function doExport(header){
-  const el=document.getElementById('pdf-root');
-  if(!el)throw new Error('Preview not found');
-  const prev=el.style.cssText;
-  el.style.cssText='position:fixed;top:-99999px;left:0;width:794px;background:#fff;visibility:visible;display:block;z-index:-1;';
-  try{
-    const canvas=await html2canvas(el,{scale:2,useCORS:true,backgroundColor:'#fff',width:794,logging:false});
-    const imgData=canvas.toDataURL('image/png');
-    const {jsPDF}=window.jspdf;
-    const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
-    const W=pdf.internal.pageSize.getWidth(),H=pdf.internal.pageSize.getHeight();
-    const m=10,cw=W-m*2,scale=cw/(canvas.width/2),totalH=(canvas.height/2)*scale,usable=H-m*2;
-    if(totalH<=usable){pdf.addImage(imgData,'PNG',m,m,cw,totalH);}
-    else{
-      const pages=Math.ceil(totalH/usable);
-      for(let i=0;i<pages;i++){
-        if(i>0)pdf.addPage();
-        pdf.addImage(imgData,'PNG',m,m-(i*usable),cw,totalH);
-        pdf.setFillColor(255,255,255);pdf.rect(0,0,W,m,'F');pdf.rect(0,m+usable,W,H,'F');
-      }
-    }
-    pdf.save(((header.examTitle||'paper')+'_'+(header.subject||'exam')).replace(/\s+/g,'_')+'.pdf');
-  }finally{el.style.cssText=prev;}
 }
 
 /* ══ COMPONENTS ══ */
@@ -455,13 +410,13 @@ function Settings(){
   const close=()=>d({t:'SETOPEN',p:false});
   const save=()=>{
     d({t:'SETTINGS',p:{mcqStyle:s.settings.mcqStyle,showAns:s.settings.showAns,apiKey:s.settings.apiKey}});
-    try{localStorage.setItem('qpb_mcq',s.settings.mcqStyle);localStorage.setItem('qpb_orkey',s.settings.apiKey||'');}catch(e){}
+    try{localStorage.setItem('qpb_mcq',s.settings.mcqStyle);localStorage.setItem('qpb_apikey',s.settings.apiKey||'');}catch(e){}
     d({t:'NOTIF',p:{type:'success',msg:'Settings saved!'}});close();
   };
   const test=async()=>{
     if(!s.settings.apiKey){setTres('fail');setTmsg('Enter API key first.');return;}
     setTesting(true);setTres(null);
-    try{await geminiTest(s.settings.apiKey);setTres('ok');setTmsg('OpenRouter works! ✓');}
+    try{await geminiTest(s.settings.apiKey);setTres('ok');setTmsg('Mistral works! ✓');}
     catch(e){setTres('fail');setTmsg(e.message);}
     finally{setTesting(false);}
   };
@@ -473,9 +428,9 @@ function Settings(){
           <div>
             <div style={{fontWeight:600,fontSize:13,marginBottom:8}}>🤖 AI Provider</div>
             <div style={{marginBottom:10}}>
-              <label className="lbl">OpenRouter API Key (free)</label>
-              <input className="inp" type="password" placeholder="sk-or-v1-..." value={s.settings.apiKey||''} onChange={e=>d({t:'SETTINGS',p:{apiKey:e.target.value}})}/>
-              <p style={{fontSize:11,color:'#6b7299',marginTop:4}}>Get your key at <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" style={{color:'#4f63f8'}}>openrouter.ai/keys</a>. Saved locally.</p>
+              <label className="lbl">Mistral API Key (free)</label>
+              <input className="inp" type="password" placeholder="..." value={s.settings.apiKey||''} onChange={e=>d({t:'SETTINGS',p:{apiKey:e.target.value}})}/>
+              <p style={{fontSize:11,color:'#6b7299',marginTop:4}}>Get your key at <a href="https://console.mistral.ai/api-keys" target="_blank" rel="noreferrer" style={{color:'#4f63f8'}}>console.mistral.ai</a>. Saved locally.</p>
             </div>
             <button className="btn btn-secondary btn-sm" onClick={test} disabled={testing}>{testing?<span className="spin">⟳</span>:'🔬'} Test Connection</button>
             {tres&&<p style={{fontSize:12,marginTop:6,color:tres==='ok'?'#15803d':'#dc2626'}}>{tmsg}</p>}
@@ -517,7 +472,8 @@ function HeaderEditor(){
         <div><label className="lbl">Total Marks (পূর্ণমান)</label><input className="inp" placeholder="100" value={h.totalMarks} onChange={set('totalMarks')}/></div>
         <div><label className="lbl">Set (সেট)</label><input className="inp" placeholder="পায়রা / A" value={h.set||''} onChange={set('set')}/></div>
         <div><label className="lbl">Year (সাল)</label><input className="inp" placeholder="2026" value={h.year} onChange={set('year')}/></div>
-        <div style={{gridColumn:'1/-1'}}><label className="lbl">Instructions (নির্দেশাবলি / দ্রষ্টব্য)</label><textarea className="ta" rows={2} placeholder="দ্রষ্টব্যঃ সরবরাহকৃত নৈর্ব্যক্তিক অভীক্ষার উত্তরপত্রে সঠিক উত্তরের বৃত্তটি ভরাট করতে হবে। প্রতিটি প্রশ্নের মান ১।" value={h.instructions} onChange={set('instructions')}/></div>
+        <div style={{gridColumn:'1/-1'}}><label className="lbl">Instructions (নির্দেশাবলি - বাংলা)</label><textarea className="ta" rows={2} value={h.instructions} onChange={set('instructions')}/></div>
+        <div style={{gridColumn:'1/-1'}}><label className="lbl">Instructions (English)</label><textarea className="ta" rows={2} value={h.instructionsEn} onChange={set('instructionsEn')}/></div>
       </div>
     </div>
   );
@@ -635,7 +591,8 @@ function MCQForm({q}){
 function CQForm({q}){
   const{d}=useApp();
   const upd=p=>d({t:'UPD_Q',id:q.id,p});
-  const subs=[{k:'subA',bn:'ক) জ্ঞানমূলক',en:'Knowledge (1 mark)',m:1},{k:'subB',bn:'খ) অনুধাবনমূলক',en:'Comprehension (2 marks)',m:2},{k:'subC',bn:'গ) প্রয়োগমূলক',en:'Application (3 marks)',m:3},{k:'subD',bn:'ঘ) উচ্চতর দক্ষতামূলক',en:'Higher-order (4 marks)',m:4}];
+  const isMath=!!(q.subC&&!q.subD);
+  const subs=[{k:'subA',bn:'ক) জ্ঞানমূলক',en:'Knowledge (1 mark)',m:1},{k:'subB',bn:'খ) অনুধাবনমূলক',en:'Comprehension (2 marks)',m:2},{k:'subC',bn:'গ) প্রয়োগমূলক',en:'Application (3 marks)',m:3},{k:'subD',bn:'ঘ) উচ্চতর দক্ষতামূলক (গণিত হলে খালি রাখুন)',en:'Higher-order (4 marks) — leave blank for math CQ',m:4}];
   return(
     <div style={{display:'flex',flexDirection:'column',gap:10}}>
       <div>
@@ -655,7 +612,7 @@ function CQForm({q}){
           </div>
         </div>
       ))}
-      <div style={{background:'#f5f3ff',border:'1px solid #ddd6fe',borderRadius:8,padding:'7px 11px',fontSize:12,color:'#6d28d9'}}>Total: <strong>10 marks</strong> (1+2+3+4)</div>
+      <div style={{background:'#f5f3ff',border:'1px solid #ddd6fe',borderRadius:8,padding:'7px 11px',fontSize:12,color:'#6d28d9'}}>Total: <strong>10 marks</strong> {isMath?'(2+4+4 — math CQ detected)':'(1+2+3+4)'}</div>
     </div>
   );
 }
@@ -858,9 +815,9 @@ function ImgUpload(){
     <div className="card" style={{padding:18}}>
       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
         <div className="sec-hdr" style={{margin:0}}>AI Image Extraction</div>
-        <span className="badge badge-mcq" style={{fontSize:10}}>Gemini 2.0 Flash</span>
+        <span className="badge badge-mcq" style={{fontSize:10}}>Mistral Pixtral</span>
       </div>
-      <p style={{fontSize:12,color:'#6b7299',marginBottom:14,lineHeight:1.6}}>Upload or paste (Ctrl+V) a photo of a question paper → Gemini auto-extracts all questions.</p>
+      <p style={{fontSize:12,color:'#6b7299',marginBottom:14,lineHeight:1.6}}>Upload or paste (Ctrl+V) a photo of a question paper → Mistral auto-extracts all questions.</p>
       {!file?(
         <div>
           <div className={'dropzone'+(dov?' dov':'')}
@@ -902,7 +859,7 @@ function ImgUpload(){
           {err&&<div style={{background:'#fef2f2',border:'1px solid #fecaca',borderRadius:8,padding:'8px 12px',fontSize:12,color:'#dc2626',lineHeight:1.6}}>⚠️ {err}</div>}
           {loading&&<div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:'#f0f4ff',border:'1px solid #c7d2fe',borderRadius:8}}>
             <span className="spin" style={{fontSize:18}}>⟳</span>
-            <div><p style={{fontWeight:600,fontSize:12,color:'#3730a3'}}>Gemini analyzing image…</p><p style={{fontSize:11,color:'#6366f1'}}>Reading Bangla text, detecting question types</p></div>
+            <div><p style={{fontWeight:600,fontSize:12,color:'#3730a3'}}>Mistral analyzing image…</p><p style={{fontSize:11,color:'#6366f1'}}>Reading Bangla text, detecting question types</p></div>
           </div>}
           {result&&!loading&&<div style={{background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:8,padding:'10px 12px',fontSize:12,color:'#15803d'}}>
             <div style={{fontWeight:700,marginBottom:5}}>✅ Found {result.length} question(s)</div>
@@ -912,12 +869,12 @@ function ImgUpload(){
             </ul>
           </div>}
           <div style={{display:'flex',gap:8}}>
-            {!result&&<button className="btn btn-primary" style={{flex:1}} onClick={extract} disabled={loading}>{loading?<><span className="spin">⟳</span> Analyzing…</>:<>✨ Extract with Gemini</>}</button>}
+            {!result&&<button className="btn btn-primary" style={{flex:1}} onClick={extract} disabled={loading}>{loading?<><span className="spin">⟳</span> Analyzing…</>:<>✨ Extract with Mistral</>}</button>}
             {result&&<button className="btn btn-primary" style={{flex:1}} onClick={importAll}>✅ Import {result.length} Question{result.length>1?'s':''}</button>}
             {result&&<button className="btn btn-secondary" onClick={()=>{setRes(null);setErr('');}}>↩ Re-extract</button>}
             <button className="btn btn-secondary" onClick={clear}>Clear</button>
           </div>
-          <p style={{fontSize:10,color:'#9ca3af',textAlign:'center'}}>Powered by Claude AI (claude-sonnet-4-6)</p>
+          <p style={{fontSize:10,color:'#9ca3af',textAlign:'center'}}>Powered by Mistral AI (pixtral-12b)</p>
         </div>
       )}
     </div>
@@ -962,7 +919,7 @@ function Preview({forPDF}){
           </div>
         )}
         {h.set&&<div className="pp-meta-row2"><span><strong>{tr.set}:</strong> {h.set}</span><span><strong>{tr.received}:</strong> ____</span></div>}
-        {h.instructions&&<div className="pp-instruction">{h.instructions}</div>}
+        {(isEN?h.instructionsEn:h.instructions)&&<div className="pp-instruction" style={{whiteSpace:'pre-line'}}>{isEN?h.instructionsEn:h.instructions}</div>}
       </div>
 
       {questions.length===0&&<div className="prev-empty"><div style={{fontSize:36,marginBottom:10}}>📄</div><p style={{fontWeight:600}}>Your paper will appear here</p></div>}
@@ -1024,7 +981,12 @@ function Preview({forPDF}){
 
 /* CQ preview sub-component */
 function CQPreview({q,i,tr,lang,isEN,txt,num}){
-  const subMeta=[
+  const isMath=!!(q.subC&&!q.subD);
+  const subMeta=isMath?[
+    {k:'subA',kEn:'subAEn',l:'ক',le:'a',m:2},
+    {k:'subB',kEn:'subBEn',l:'খ',le:'b',m:4},
+    {k:'subC',kEn:'subCEn',l:'গ',le:'c',m:4}
+  ]:[
     {k:'subA',kEn:'subAEn',l:'ক',le:'a',m:1},
     {k:'subB',kEn:'subBEn',l:'খ',le:'b',m:2},
     {k:'subC',kEn:'subCEn',l:'গ',le:'c',m:3},
@@ -1032,11 +994,9 @@ function CQPreview({q,i,tr,lang,isEN,txt,num}){
   ];
   return(
     <div className="qblock">
-      <div className="qstem" style={{fontWeight:700}}>
-        <span className="qstem-num">{num(i+1)}.</span>
-        <span>{isEN?'Stimulus:':tr.stimulus+':'}</span>
-      </div>
-      {(q.stimulus||q.stimulusEn)&&<div className="cq-stim-box"><MText t={txt(q.stimulus,q.stimulusEn)}/></div>}
+      {(q.stimulus||q.stimulusEn)?
+        <div className="cq-stim-box" style={{display:'flex',gap:3}}><span className="qstem-num" style={{fontWeight:700}}>{num(i+1)}.</span><span><MText t={txt(q.stimulus,q.stimulusEn)}/></span></div>
+        :<div className="qstem" style={{fontWeight:700}}><span className="qstem-num">{num(i+1)}.</span></div>}
       {q.diagramImg&&<img src={q.diagramImg} alt="diagram" className="cq-stim-img"/>}
       <div className="cq-subs">
         {subMeta.map(sub=>{
@@ -1062,19 +1022,11 @@ function toBanglaNum(n){
 /* Toolbar — with language toggle */
 function Toolbar(){
   const{s,d}=useApp();
-  const[exp,setExp]=useState(false);
   const notify=(type,msg)=>d({t:'NOTIF',p:{type,msg}});
   const lang=s.settings.lang||'bn';
   const pm=s.settings.paperMode||'bn';
   const translatedCount=s.questions.filter(q=>q.translatedAt||q.stemEn||q.stimulusEn).length;
 
-  const handleExport=async()=>{
-    if(!s.questions.length){notify('warning','Add questions first.');return;}
-    setExp(true);
-    try{await doExport(s.header);notify('success','PDF exported!');}
-    catch(e){notify('error',e.message);}
-    finally{setExp(false);}
-  };
   const handlePrint=()=>{
     if(!s.questions.length){notify('warning','Add questions first.');return;}
     window.print();
@@ -1108,10 +1060,7 @@ function Toolbar(){
         <button className={'lang-btn'+(pm==='en'?' on':'')} style={{color:pm==='en'?'#059669':'#6b7299',background:pm==='en'?'#d1fae5':undefined}} onClick={()=>d({t:'SETTINGS',p:{paperMode:'en'}})}>📄EN{translatedCount>0?<span style={{fontSize:9,marginLeft:2,background:'#059669',color:'#fff',borderRadius:99,padding:'0 4px'}}>{translatedCount}</span>:null}</button>
       </div>
       {s.questions.length>0&&<span className="badge badge-mcq">{s.questions.length} Q</span>}
-      <button className="btn btn-ghost" onClick={handlePrint} title="Print">🖨️</button>
-      <button className="btn btn-primary" onClick={handleExport} disabled={exp}>
-        {exp?<span className="spin">⟳</span>:'⬇️'} <span>{exp?'Exporting…':'Export PDF'}</span>
-      </button>
+      <button className="btn btn-primary" onClick={handlePrint} title="Print">🖨️ <span>Print</span></button>
       <button className="btn btn-ghost" onClick={clearAll} style={{color:'#dc2626'}} title="Clear all">🗑</button>
       <button className="btn btn-ghost" onClick={()=>d({t:'SETOPEN',p:true})} title="Settings">⚙️</button>
     </header>
