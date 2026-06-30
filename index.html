@@ -205,8 +205,17 @@ const T = {
 
 /* ── Math renderer ── */
 let _n=0; const uid=()=>'q_'+Date.now()+'_'+(++_n);
+/* Convert \(...\) and \[...\] to $...$ and $$...$$ */
+function normDelim(t){
+  if(!t) return t;
+  t=t.replace(/\\\[([\s\S]*?)\\\]/g,'$$$$$1$$$$');  // \[...\] → $$...$$
+  t=t.replace(/\\\(([\s\S]*?)\\\)/g,'$$$1$$');       // \(...\) → $...$
+  return t;
+}
 function renderMath(text){
-  if(!text)return'';let out='';
+  if(!text)return'';
+  text=normDelim(text);
+  let out='';
   for(const seg of text.split(/(\$\$[\s\S]+?\$\$)/g)){
     if(seg.startsWith('$$')&&seg.endsWith('$$')){
       try{out+=katex.renderToString(seg.slice(2,-2),{displayMode:true,throwOnError:false});}
@@ -309,27 +318,74 @@ const claudeCall=(msgs,maxTokens,apiKey,isVision)=>mistralCall(msgs,maxTokens,ap
 
 async function geminiVision(file,key){
   const b64=await fileToB64(file),mime=file.type||'image/jpeg';
-  const prompt=`You are an expert at reading Bangladeshi SSC/HSC exam papers. Extract ALL questions from this image as a JSON array ONLY — no markdown fences, no explanation.
-Schema:
-MCQ: {"type":"mcq","stem":"...","options":{"a":"...","b":"...","c":"...","d":"..."},"marks":1}
-CQ:  {"type":"cq","stimulus":"...","subA":"...","subB":"...","subC":"...","subD":"..."}
-SQ:  {"type":"sq","stem":"...","marks":5}
-Rules: preserve Bangla script exactly. Map ক/খ/গ/ঘ options to a/b/c/d. Wrap math in $...$ or $$...$$. Return ONLY a JSON array.`;
-  function extractJSON(s){
-    s=s.replace(/```json\n?/gi,'').replace(/```\n?/g,'');
-    try{const a=JSON.parse(s.trim());if(Array.isArray(a))return a;}catch(e){}
-    const start=s.indexOf('['),end=s.lastIndexOf(']');
-    if(start!==-1&&end>start){try{const a=JSON.parse(s.slice(start,end+1));if(Array.isArray(a))return a;}catch(e){}}
-    return null;
-  }
-  const msgs=[{role:'user',content:[{type:'image_url',image_url:{url:`data:${mime};base64,${b64}`}},{type:'text',text:prompt}]}];
-  let arr=null,lastRaw='';
+
+  /* PASS 1 — vision model: image → raw text transcript (no JSON pressure) */
+  const vPrompt=`You are an OCR expert for Bangladeshi SSC/HSC exam papers. Read this image and transcribe ALL questions exactly as they appear.
+Include: question numbers, full question text (preserve Bangla script perfectly), all answer options with labels (ক খ গ ঘ), math expressions, stimulus/উদ্দীপক, and sub-questions.
+For math: write LaTeX with $...$ for inline and $$...$$ for display. Use single backslash for commands: \frac{a}{b} \sqrt{x} \alpha etc.
+Output raw transcript only. No JSON, no formatting.`;
+
+  let rawText='';
   try{
-    const txt=await claudeCall(msgs,4096,key,true);
-    lastRaw=txt;arr=extractJSON(txt);
-  }catch(e){lastRaw=e.message;}
-  if(!arr||!arr.length) throw new Error('Extraction failed: '+lastRaw.slice(0,150));
-  return arr;
+    const vMsgs=[{role:'user',content:[
+      {type:'image_url',image_url:{url:'data:'+mime+';base64,'+b64}},
+      {type:'text',text:vPrompt}
+    ]}];
+    const vBody={model:MISTRAL_VISION_MODEL,messages:vMsgs,max_tokens:4096};
+    const vRes=await fetch(MISTRAL_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify(vBody)});
+    if(!vRes.ok){const e=await vRes.json().catch(()=>({}));throw new Error(e?.message||'Vision error '+vRes.status);}
+    const vData=await vRes.json();
+    rawText=(vData?.choices?.[0]?.message?.content||'').trim();
+  }catch(e){throw new Error('Vision failed: '+e.message);}
+  if(!rawText||rawText.length<5) throw new Error('No text found in image.');
+
+  /* PASS 2 — text model with json_object mode: transcript → guaranteed valid JSON */
+  const sPrompt=`Convert this exam transcript into a JSON object with key "questions" containing an array.
+
+TRANSCRIPT:
+${rawText}
+
+Each item must match exactly one schema:
+MCQ (question with 4 answer options ক/খ/গ/ঘ or a/b/c/d):
+  {"type":"mcq","stem":"...","options":{"a":"...","b":"...","c":"...","d":"..."},"marks":1}
+CQ (has উদ্দীপক/stimulus paragraph then sub-questions labeled ক/খ/গ/ঘ):
+  {"type":"cq","stimulus":"...","subA":"...","subB":"...","subC":"...","subD":"..."}
+SQ (standalone question, no options):
+  {"type":"sq","stem":"...","marks":5}
+
+Type rules — read carefully:
+- 4 labelled options present → mcq. Map: ক→a খ→b গ→c ঘ→d
+- Has stimulus/উদ্দীপক block + lettered sub-questions → cq
+- Else → sq
+
+Math rules:
+- Keep LaTeX inside $...$ (inline) or $$...$$ (display)
+- Single backslash commands: \frac \sqrt \alpha \times etc.
+- If you see \( ... \) convert to $...$. If you see \[ ... \] convert to $$$...$$$.
+
+Preserve all Bangla text exactly. Return only the JSON object, no markdown.`;
+
+  let structured='';
+  try{
+    const sBody={model:MISTRAL_TEXT_MODEL,messages:[{role:'user',content:sPrompt}],max_tokens:4096,response_format:{type:'json_object'}};
+    const sRes=await fetch(MISTRAL_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify(sBody)});
+    if(!sRes.ok){const e=await sRes.json().catch(()=>({}));throw new Error(e?.message||'Structure error '+sRes.status);}
+    const sData=await sRes.json();
+    structured=(sData?.choices?.[0]?.message?.content||'').trim();
+  }catch(e){throw new Error('Structuring failed: '+e.message);}
+
+  try{
+    const parsed=JSON.parse(structured);
+    const arr=Array.isArray(parsed)?parsed:(Array.isArray(parsed.questions)?parsed.questions:null);
+    if(!arr||!arr.length) throw new Error('No questions found.');
+    /* Normalize any remaining \(...\) or \[...\] in all string fields */
+    return arr.map(q=>{
+      const n=s=>typeof s==='string'?normDelim(s):s;
+      if(q.type==='mcq') return{...q,stem:n(q.stem),options:{a:n(q.options?.a),b:n(q.options?.b),c:n(q.options?.c),d:n(q.options?.d)}};
+      if(q.type==='cq')  return{...q,stimulus:n(q.stimulus),subA:n(q.subA),subB:n(q.subB),subC:n(q.subC),subD:n(q.subD)};
+      return{...q,stem:n(q.stem)};
+    });
+  }catch(e){throw new Error('Parse failed: '+e.message+' | '+structured.slice(0,200));}
 }
 
 async function geminiTest(key){
