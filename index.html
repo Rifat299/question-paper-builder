@@ -388,6 +388,47 @@ Preserve all Bangla text exactly. Return only the JSON object, no markdown.`;
   }catch(e){throw new Error('Parse failed: '+e.message+' | '+structured.slice(0,200));}
 }
 
+/* ── Manual paste mode — user runs the extraction on Claude/Gemini/ChatGPT/DeepSeek
+   themselves with EXTERNAL_PROMPT below, then pastes the JSON reply back here ── */
+const EXTERNAL_PROMPT=`You are an OCR + structuring expert for Bangladeshi SSC/HSC exam papers.
+Read the attached image and output ONLY a JSON object (no markdown, no explanation, no code fence) with key "questions" containing an array.
+
+Each item must match exactly one schema:
+MCQ (question with 4 answer options ক/খ/গ/ঘ or a/b/c/d):
+  {"type":"mcq","stem":"...","options":{"a":"...","b":"...","c":"...","d":"..."},"marks":1}
+CQ (has উদ্দীপক/stimulus paragraph then sub-questions labeled ক/খ/গ/ঘ):
+  {"type":"cq","stimulus":"...","subA":"...","subB":"...","subC":"...","subD":"..."}
+SQ (standalone question, no options):
+  {"type":"sq","stem":"...","marks":5}
+
+Type rules:
+- 4 labelled options present → mcq. Map: ক→a খ→b গ→c ঘ→d
+- Stimulus/উদ্দীপক block + lettered sub-questions → cq
+- Else → sq
+
+Math rules:
+- Keep LaTeX inside $...$ (inline) or $$...$$ (display)
+- Single backslash commands: \\frac \\sqrt \\alpha \\times etc.
+- Convert \\( ... \\) to $...$ and \\[ ... \\] to $$...$$
+
+Preserve all Bangla text exactly. Return only the JSON object.`;
+
+function parseManualJSON(raw){
+  let cleaned=(raw||'').trim().replace(/```json\n?/gi,'').replace(/```\n?/g,'').trim();
+  if(!cleaned) throw new Error('Paste box is empty.');
+  let parsed;
+  try{parsed=JSON.parse(cleaned);}
+  catch(e){throw new Error('Invalid JSON — check the pasted text. ('+e.message+')');}
+  const arr=Array.isArray(parsed)?parsed:(Array.isArray(parsed.questions)?parsed.questions:null);
+  if(!arr||!arr.length) throw new Error('No "questions" array found in the JSON.');
+  const n=s=>typeof s==='string'?normDelim(s):s;
+  return arr.map(q=>{
+    if(q.type==='mcq') return{...q,stem:n(q.stem),options:{a:n(q.options?.a),b:n(q.options?.b),c:n(q.options?.c),d:n(q.options?.d)}};
+    if(q.type==='cq')  return{...q,stimulus:n(q.stimulus),subA:n(q.subA),subB:n(q.subB),subC:n(q.subC),subD:n(q.subD)};
+    return{...q,type:q.type||'sq',stem:n(q.stem)};
+  });
+}
+
 async function geminiTest(key){
   await mistralCall([{role:'user',content:'Reply: OK'}],10,key,false);
   return true;
@@ -838,12 +879,15 @@ function QList(){
 /* Image upload — 1-step Claude vision + Ctrl+V paste support */
 function ImgUpload(){
   const{s,d}=useApp();
+  const[mode,setMode]=useState('img'); // 'img' | 'manual'
   const[file,setFile]=useState(null);
   const[prev,setPrev]=useState(null);
   const[loading,setLoad]=useState(false);
   const[result,setRes]=useState(null);
   const[err,setErr]=useState('');
   const[dov,setDov]=useState(false);
+  const[manualText,setManualText]=useState('');
+  const[copied,setCopied]=useState(false);
   const ref=useRef();
   const apiKey=s.settings.apiKey||'';
 
@@ -859,20 +903,58 @@ function ImgUpload(){
     catch(e){setErr(e.message);}
     finally{setLoad(false);}
   };
+  const parseManual=()=>{
+    setErr('');
+    try{const qs=parseManualJSON(manualText);setRes(qs);}
+    catch(e){setErr(e.message);setRes(null);}
+  };
   const importAll=()=>{
     if(!result||!result.length)return;
     d({t:'IMPORT',p:result});
     d({t:'NOTIF',p:{type:'success',msg:result.length+' question(s) imported!'}});
     clear();
   };
-  const clear=()=>{setFile(null);if(prev)URL.revokeObjectURL(prev);setPrev(null);setRes(null);setErr('');};
+  const clear=()=>{setFile(null);if(prev)URL.revokeObjectURL(prev);setPrev(null);setRes(null);setErr('');setManualText('');};
+  const copyPrompt=()=>{
+    navigator.clipboard?.writeText(EXTERNAL_PROMPT).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),1800);});
+  };
+  const switchMode=m=>{setMode(m);clear();};
 
   return(
     <div className="card" style={{padding:18}}>
       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
-        <div className="sec-hdr" style={{margin:0}}>AI Image Extraction</div>
-        <span className="badge badge-mcq" style={{fontSize:10}}>Mistral Pixtral</span>
+        <div className="sec-hdr" style={{margin:0}}>AI Question Extraction</div>
+        <span className="badge badge-mcq" style={{fontSize:10}}>{mode==='img'?'Mistral Pixtral':'Manual Paste'}</span>
       </div>
+      <div style={{display:'flex',gap:6,marginBottom:12}}>
+        <button className={mode==='img'?'btn btn-primary btn-sm':'btn btn-secondary btn-sm'} onClick={()=>switchMode('img')}>🖼️ Upload Image</button>
+        <button className={mode==='manual'?'btn btn-primary btn-sm':'btn btn-secondary btn-sm'} onClick={()=>switchMode('manual')}>📋 Paste AI Response</button>
+      </div>
+      {mode==='manual'?(
+        <div style={{display:'flex',flexDirection:'column',gap:10}}>
+          <p style={{fontSize:12,color:'#6b7299',lineHeight:1.6}}>Run the prompt below on Claude, Gemini, ChatGPT, DeepSeek etc. with the question image attached, then paste its JSON reply here.</p>
+          <div style={{display:'flex',gap:8}}>
+            <button className="btn btn-secondary btn-sm" onClick={copyPrompt}>{copied?'✅ Copied!':'📄 Copy Extraction Prompt'}</button>
+          </div>
+          <textarea className="ta" rows={8} placeholder='Paste the AI JSON reply here, e.g. {"questions":[{"type":"mcq", ...}]}'
+            value={manualText} onChange={e=>{setManualText(e.target.value);setRes(null);setErr('');}}/>
+          {err&&<div style={{background:'#fef2f2',border:'1px solid #fecaca',borderRadius:8,padding:'8px 12px',fontSize:12,color:'#dc2626',lineHeight:1.6}}>⚠️ {err}</div>}
+          {result&&<div style={{background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:8,padding:'10px 12px',fontSize:12,color:'#15803d'}}>
+            <div style={{fontWeight:700,marginBottom:5}}>✅ Found {result.length} question(s)</div>
+            <ul style={{listStyle:'disc',paddingLeft:16,color:'#166534'}}>
+              {result.slice(0,5).map((q,i)=><li key={i}>[{(q.type||'?').toUpperCase()}] {(q.stem||q.stimulus||'').slice(0,50)}</li>)}
+              {result.length>5&&<li>…and {result.length-5} more</li>}
+            </ul>
+          </div>}
+          <div style={{display:'flex',gap:8}}>
+            {!result&&<button className="btn btn-primary" style={{flex:1}} onClick={parseManual} disabled={!manualText.trim()}>✨ Parse JSON</button>}
+            {result&&<button className="btn btn-primary" style={{flex:1}} onClick={importAll}>✅ Import {result.length} Question{result.length>1?'s':''}</button>}
+            {result&&<button className="btn btn-secondary" onClick={()=>{setRes(null);setErr('');}}>↩ Edit</button>}
+            <button className="btn btn-secondary" onClick={clear}>Clear</button>
+          </div>
+        </div>
+      ):(
+      <>
       <p style={{fontSize:12,color:'#6b7299',marginBottom:14,lineHeight:1.6}}>Upload or paste (Ctrl+V) a photo of a question paper → Mistral auto-extracts all questions.</p>
       {!file?(
         <div>
@@ -932,6 +1014,8 @@ function ImgUpload(){
           </div>
           <p style={{fontSize:10,color:'#9ca3af',textAlign:'center'}}>Powered by Mistral AI (pixtral-12b)</p>
         </div>
+      )}
+      </>
       )}
     </div>
   );
