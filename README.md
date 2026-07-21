@@ -43,6 +43,9 @@ $$\frac{-b \pm \sqrt{b^2-4ac}}{2a}$$
 ### AI image extraction
 Upload or paste a photo of any question paper and Mistral reads it in two passes — first an OCR-style transcript of the page, then a pass that turns that transcript into structured MCQ/CQ/SQ entries. It picks up Bangla text, math, MCQ options, and CQ structure. Requires a free API key from Mistral (see setup).
 
+### Manual JSON question input from OutSide AI response
+MCQ/CQ/SQ can be added via json format generated from external ai response. Copy prompt from manual input section and give to AI to generate JSON response. This json will automatically input question on paper.
+
 ### English version
 Each question card has a **Translate with AI** button at the bottom. One click sends the question to Mistral and gets back an English translation — the LaTeX inside `$...$` is left untouched so equations don't break. The translation is editable. Switch the toolbar to **📄EN** and the preview shows the English version. Two papers from one session.
 
