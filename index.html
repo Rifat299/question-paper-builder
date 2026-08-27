@@ -266,14 +266,27 @@ const makeQ=type=>{
   return{...base,stem:'',marks:5,stemEn:'',translatedAt:null};
 };
 const defHdr={schoolName:'',examTitle:'',subject:'',subjectCode:'',time:'',totalMarks:'',year:'',set:'',instructions:'দ্রষ্টব্যঃ সরবরাহকৃত নৈর্ব্যত্তিক অভীক্ষার উত্তরপত্রে প্রশ্নের ক্রমিক নম্বরের বিপরীতে প্রদত্ত বর্ণসম্বলিত বৃত্ত সমুহ হতে সঠিক উত্তরের বৃত্তটি বল পয়েন্ট কলম দ্বারা সম্পুর্ণ ভরাট করো । প্রতিটি প্রশ্নের মান ১।\nপ্রশ্নপত্রে কোনো প্রকার দাগ/চিহ্ন দেয়া যাবেনা ।',instructionsEn:"Note: For each question, fully shade the circle corresponding to the correct answer using a ballpoint pen, matching the question's serial number. Each question carries 1 mark.\nNo marks or stray marks are allowed on the question paper."};
+const AUTOSAVE_KEY='qpb_autosave_v1';
+const loadAutosave=()=>{
+  try{
+    if(typeof localStorage==='undefined')return null;
+    const raw=localStorage.getItem(AUTOSAVE_KEY);
+    if(!raw)return null;
+    const p=JSON.parse(raw);
+    if(!p||!Array.isArray(p.questions))return null;
+    return p;
+  }catch(e){return null;}
+};
+const savedProject=loadAutosave();
 const initState={
-  header:defHdr,questions:[],
+  header:(savedProject&&savedProject.header)||defHdr,
+  questions:(savedProject&&savedProject.questions)?savedProject.questions.map(q=>({...makeQ(q.type||'sq'),...q})):[],
   settings:{
     apiKey:(typeof localStorage!=='undefined'&&localStorage.getItem('qpb_apikey'))||'',
     mcqStyle:(typeof localStorage!=='undefined'&&localStorage.getItem('qpb_mcq'))||'bangla',
     showAns:false,
     lang:'bn',
-    paperMode:'bn', // 'bn' | 'en' — controls which version preview/export shows
+    paperMode:(savedProject&&savedProject.paperMode)||'bn', // 'bn' | 'en' — controls which version preview/export shows
   },
   ui:{settingsOpen:false,activeId:null,notif:null,tab:'editor'},
 };
@@ -286,6 +299,7 @@ function reducer(s,a){
     case 'REORDER': return{...s,questions:a.p};
     case 'IMPORT':{const qs=a.p.map(q=>({...makeQ(q.type||'sq'),...q,id:uid()}));return{...s,questions:[...s.questions,...qs]};}
     case 'CLEAR':   return{...s,questions:[],header:defHdr};
+    case 'LOAD_PROJECT': return{...s,header:a.p.header||defHdr,questions:(a.p.questions||[]).map(q=>({...makeQ(q.type||'sq'),...q})),settings:{...s.settings,paperMode:a.p.paperMode||s.settings.paperMode},ui:{...s.ui,activeId:null}};
     case 'SETTINGS':return{...s,settings:{...s.settings,...a.p}};
     case 'SAVE_KEY': return s; // deprecated
     case 'NOTIF':   return{...s,ui:{...s.ui,notif:a.p}};
@@ -1162,6 +1176,7 @@ function toBanglaNum(n){
 /* Toolbar — with language toggle */
 function Toolbar(){
   const{s,d}=useApp();
+  const fileInputRef=useRef(null);
   const notify=(type,msg)=>d({t:'NOTIF',p:{type,msg}});
   const lang=s.settings.lang||'bn';
   const pm=s.settings.paperMode||'bn';
@@ -1174,6 +1189,39 @@ function Toolbar(){
   const clearAll=()=>{
     if(!s.questions.length)return;
     if(window.confirm('Clear all questions and header? This cannot be undone.')){d({t:'CLEAR'});notify('success','Paper cleared.');}
+  };
+  const handleSaveProject=()=>{
+    if(!s.questions.length){notify('warning','Add questions first.');return;}
+    const payload={header:s.header,questions:s.questions,paperMode:s.settings.paperMode,savedAt:new Date().toISOString()};
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    const safeName=(s.header.examTitle||s.header.subject||'question-paper').trim().replace(/[^a-zA-Z0-9\u0980-\u09FF_-]+/g,'_').slice(0,60)||'question-paper';
+    a.href=url;a.download=`${safeName}.qpb.json`;
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    notify('success','Saved progress file.');
+  };
+  const handleLoadClick=()=>fileInputRef.current&&fileInputRef.current.click();
+  const handleFileChosen=(e)=>{
+    const file=e.target.files&&e.target.files[0];
+    e.target.value='';
+    if(!file)return;
+    const reader=new FileReader();
+    reader.onload=()=>{
+      try{
+        const parsed=JSON.parse(reader.result);
+        if(!parsed||!Array.isArray(parsed.questions))throw new Error('Missing "questions" array.');
+        const proceed=s.questions.length===0||window.confirm('This will replace your current questions and header with the file\'s contents. Continue?');
+        if(!proceed)return;
+        d({t:'LOAD_PROJECT',p:parsed});
+        notify('success',`Loaded ${parsed.questions.length} question(s).`);
+      }catch(err){
+        notify('error','Invalid progress file: '+err.message);
+      }
+    };
+    reader.onerror=()=>notify('error','Could not read file.');
+    reader.readAsText(file);
   };
 
   return(
@@ -1201,6 +1249,9 @@ function Toolbar(){
       </div>
       {s.questions.length>0&&<span className="badge badge-mcq">{s.questions.length} Q</span>}
       <button className="btn btn-primary" onClick={handlePrint} title="Print">🖨️ <span>Print</span></button>
+      <button className="btn btn-ghost" onClick={handleSaveProject} title="Save progress as a JSON file you can re-upload later">💾 <span>Save</span></button>
+      <button className="btn btn-ghost" onClick={handleLoadClick} title="Load a previously saved progress JSON file">📂 <span>Load</span></button>
+      <input ref={fileInputRef} type="file" accept="application/json,.json" style={{display:'none'}} onChange={handleFileChosen}/>
       <button className="btn btn-ghost" onClick={clearAll} style={{color:'#dc2626'}} title="Clear all">🗑</button>
       <button className="btn btn-ghost" onClick={()=>d({t:'SETOPEN',p:true})} title="Settings">⚙️</button>
     </header>
@@ -1247,6 +1298,15 @@ function App(){
 
 function Root(){
   const[s,d]=useReducer(reducer,initState);
+  useEffect(()=>{
+    const t=setTimeout(()=>{
+      try{
+        if(typeof localStorage==='undefined')return;
+        localStorage.setItem(AUTOSAVE_KEY,JSON.stringify({header:s.header,questions:s.questions,paperMode:s.settings.paperMode}));
+      }catch(e){/* storage full/unavailable — ignore */}
+    },400);
+    return()=>clearTimeout(t);
+  },[s.header,s.questions,s.settings.paperMode]);
   return<Ctx.Provider value={{s,d}}><App/></Ctx.Provider>;
 }
 const container=document.getElementById('root');
