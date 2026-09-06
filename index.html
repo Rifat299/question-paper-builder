@@ -283,6 +283,7 @@ const initState={
   questions:(savedProject&&savedProject.questions)?savedProject.questions.map(q=>({...makeQ(q.type||'sq'),...q})):[],
   settings:{
     apiKey:(typeof localStorage!=='undefined'&&localStorage.getItem('qpb_apikey'))||'',
+    apiKey2:(typeof localStorage!=='undefined'&&localStorage.getItem('qpb_apikey2'))||'',
     mcqStyle:(typeof localStorage!=='undefined'&&localStorage.getItem('qpb_mcq'))||'bangla',
     showAns:false,
     lang:'bn',
@@ -313,24 +314,43 @@ function reducer(s,a){
 const Ctx=createContext(null);
 const useApp=()=>useContext(Ctx);
 
-/* ── Mistral Vision + Translation ── */
-const MISTRAL_URL='https://api.mistral.ai/v1/chat/completions';
-const MISTRAL_VISION_MODEL='pixtral-12b-2409';
-const MISTRAL_TEXT_MODEL='mistral-small-latest';
+/* ── Groq (primary) + OpenRouter free-router (fallback) — Vision + Translation ── */
+const GROQ_URL='https://api.groq.com/openai/v1/chat/completions';
+const GROQ_VISION_MODEL='meta-llama/llama-4-scout-17b-16e-instruct';
+const GROQ_TEXT_MODEL='llama-3.3-70b-versatile';
+const OPENROUTER_URL='https://openrouter.ai/api/v1/chat/completions';
+const OPENROUTER_MODEL='openrouter/free'; // auto-picks a free vision-capable model
 function fileToB64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});}
 
-async function mistralCall(messages, maxTokens=1024, apiKey='', isVision=false){
-  const body={model:isVision?MISTRAL_VISION_MODEL:MISTRAL_TEXT_MODEL,messages,max_tokens:maxTokens};
-  if(!isVision) body.response_format={type:'json_object'};
-  const res=await fetch(MISTRAL_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},body:JSON.stringify(body)});
-  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.message||'Mistral error '+res.status);}
+// apiKey = groq key (settings.apiKey), apiKey2 = openrouter key (settings.apiKey2)
+async function callOneProvider(url, model, messages, maxTokens, key, isVision, wantJson){
+  const body={model,messages,max_tokens:maxTokens};
+  if(wantJson) body.response_format={type:'json_object'};
+  const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify(body)});
+  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||e?.message||'HTTP '+res.status);}
   const data=await res.json();
   return(data?.choices?.[0]?.message?.content||'').replace(/```json\n?/gi,'').replace(/```\n?/g,'').trim();
 }
-// alias kept so geminiVision/geminiTranslate calls work unchanged
-const claudeCall=(msgs,maxTokens,apiKey,isVision)=>mistralCall(msgs,maxTokens,apiKey,isVision);
 
-async function geminiVision(file,key){
+// Tries Groq first, falls back to OpenRouter free router on any failure (rate limit, downtime, etc.)
+async function mistralCall(messages, maxTokens=1024, apiKey='', isVision=false, apiKey2=''){
+  const wantJson=!isVision;
+  const errors=[];
+  if(apiKey){
+    try{ return await callOneProvider(GROQ_URL, isVision?GROQ_VISION_MODEL:GROQ_TEXT_MODEL, messages, maxTokens, apiKey, isVision, wantJson); }
+    catch(e){ errors.push('Groq: '+e.message); }
+  }
+  if(apiKey2){
+    try{ return await callOneProvider(OPENROUTER_URL, OPENROUTER_MODEL, messages, maxTokens, apiKey2, isVision, wantJson); }
+    catch(e){ errors.push('OpenRouter: '+e.message); }
+  }
+  if(!apiKey&&!apiKey2) throw new Error('No API key set. Add a Groq and/or OpenRouter key in Settings.');
+  throw new Error('All providers failed — '+errors.join(' | '));
+}
+// alias kept so geminiVision/geminiTranslate calls work unchanged
+const claudeCall=(msgs,maxTokens,apiKey,isVision,apiKey2)=>mistralCall(msgs,maxTokens,apiKey,isVision,apiKey2);
+
+async function geminiVision(file,key,key2){
   const b64=await fileToB64(file),mime=file.type||'image/jpeg';
 
   /* PASS 1 — vision model: image → raw text transcript (no JSON pressure) */
@@ -345,11 +365,7 @@ Output raw transcript only. No JSON, no formatting.`;
       {type:'image_url',image_url:{url:'data:'+mime+';base64,'+b64}},
       {type:'text',text:vPrompt}
     ]}];
-    const vBody={model:MISTRAL_VISION_MODEL,messages:vMsgs,max_tokens:4096};
-    const vRes=await fetch(MISTRAL_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify(vBody)});
-    if(!vRes.ok){const e=await vRes.json().catch(()=>({}));throw new Error(e?.message||'Vision error '+vRes.status);}
-    const vData=await vRes.json();
-    rawText=(vData?.choices?.[0]?.message?.content||'').trim();
+    rawText=await mistralCall(vMsgs,4096,key,true,key2);
   }catch(e){throw new Error('Vision failed: '+e.message);}
   if(!rawText||rawText.length<5) throw new Error('No text found in image.');
 
@@ -381,11 +397,7 @@ Preserve all Bangla text exactly. Return only the JSON object, no markdown.`;
 
   let structured='';
   try{
-    const sBody={model:MISTRAL_TEXT_MODEL,messages:[{role:'user',content:sPrompt}],max_tokens:4096,response_format:{type:'json_object'}};
-    const sRes=await fetch(MISTRAL_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify(sBody)});
-    if(!sRes.ok){const e=await sRes.json().catch(()=>({}));throw new Error(e?.message||'Structure error '+sRes.status);}
-    const sData=await sRes.json();
-    structured=(sData?.choices?.[0]?.message?.content||'').trim();
+    structured=await mistralCall([{role:'user',content:sPrompt}],4096,key,false,key2);
   }catch(e){throw new Error('Structuring failed: '+e.message);}
 
   try{
@@ -443,13 +455,13 @@ function parseManualJSON(raw){
   });
 }
 
-async function geminiTest(key){
-  await mistralCall([{role:'user',content:'Reply: OK'}],10,key,false);
+async function geminiTest(key,key2){
+  await mistralCall([{role:'user',content:'Reply: OK'}],10,key,false,key2);
   return true;
 }
 
 /* ── Claude Translation — Bangla question → English ── */
-async function geminiTranslate(q, key){
+async function geminiTranslate(q, key, key2){
   const LATEX_RULE=`CRITICAL RULE — LATEX PROTECTION: Identify every mathematical expression wrapped inside single dollar signs ($...$) or double dollar signs ($$...$$). Treat ALL such expressions as strictly READ-ONLY. Do NOT translate them, do NOT modify any characters inside them, do NOT adjust spaces, do NOT remove or alter the dollar sign delimiters, do NOT escape or add backslashes. Copy them byte-for-byte identical to the original. This rule overrides everything else.`;
 
   let content='';
@@ -490,7 +502,7 @@ Output: {"stemEn":"..."}
 Additional rules: Translate only Bangla words to natural English.`;
   }
 
-  const txt=await claudeCall([{role:'user',content}],1024,key,false);
+  const txt=await claudeCall([{role:'user',content}],1024,key,false,key2);
   try{
     const s=txt.replace(/```json\n?/gi,'').replace(/```\n?/g,'').trim();
     // try direct, then find first {...}
@@ -520,14 +532,14 @@ function Settings(){
   const[tmsg,setTmsg]=useState('');
   const close=()=>d({t:'SETOPEN',p:false});
   const save=()=>{
-    d({t:'SETTINGS',p:{mcqStyle:s.settings.mcqStyle,showAns:s.settings.showAns,apiKey:s.settings.apiKey}});
-    try{localStorage.setItem('qpb_mcq',s.settings.mcqStyle);localStorage.setItem('qpb_apikey',s.settings.apiKey||'');}catch(e){}
+    d({t:'SETTINGS',p:{mcqStyle:s.settings.mcqStyle,showAns:s.settings.showAns,apiKey:s.settings.apiKey,apiKey2:s.settings.apiKey2}});
+    try{localStorage.setItem('qpb_mcq',s.settings.mcqStyle);localStorage.setItem('qpb_apikey',s.settings.apiKey||'');localStorage.setItem('qpb_apikey2',s.settings.apiKey2||'');}catch(e){}
     d({t:'NOTIF',p:{type:'success',msg:'Settings saved!'}});close();
   };
   const test=async()=>{
-    if(!s.settings.apiKey){setTres('fail');setTmsg('Enter API key first.');return;}
+    if(!s.settings.apiKey&&!s.settings.apiKey2){setTres('fail');setTmsg('Enter at least one API key first.');return;}
     setTesting(true);setTres(null);
-    try{await geminiTest(s.settings.apiKey);setTres('ok');setTmsg('Mistral works! ✓');}
+    try{await geminiTest(s.settings.apiKey,s.settings.apiKey2);setTres('ok');setTmsg('Connection works! ✓');}
     catch(e){setTres('fail');setTmsg(e.message);}
     finally{setTesting(false);}
   };
@@ -539,9 +551,14 @@ function Settings(){
           <div>
             <div style={{fontWeight:600,fontSize:13,marginBottom:8}}>🤖 AI Provider</div>
             <div style={{marginBottom:10}}>
-              <label className="lbl">Mistral API Key (free)</label>
+              <label className="lbl">Groq API Key (free, primary)</label>
               <input className="inp" type="password" placeholder="..." value={s.settings.apiKey||''} onChange={e=>d({t:'SETTINGS',p:{apiKey:e.target.value}})}/>
-              <p style={{fontSize:11,color:'#6b7299',marginTop:4}}>Get your key at <a href="https://console.mistral.ai/api-keys" target="_blank" rel="noreferrer" style={{color:'#4f63f8'}}>console.mistral.ai</a>. Saved locally.</p>
+              <p style={{fontSize:11,color:'#6b7299',marginTop:4}}>Get your key at <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer" style={{color:'#4f63f8'}}>console.groq.com/keys</a>. Saved locally.</p>
+            </div>
+            <div style={{marginBottom:10}}>
+              <label className="lbl">OpenRouter API Key (free, fallback)</label>
+              <input className="inp" type="password" placeholder="..." value={s.settings.apiKey2||''} onChange={e=>d({t:'SETTINGS',p:{apiKey2:e.target.value}})}/>
+              <p style={{fontSize:11,color:'#6b7299',marginTop:4}}>Get your key at <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" style={{color:'#4f63f8'}}>openrouter.ai/keys</a>. Used if Groq fails or hits its rate limit. Saved locally.</p>
             </div>
             <button className="btn btn-secondary btn-sm" onClick={test} disabled={testing}>{testing?<span className="spin">⟳</span>:'🔬'} Test Connection</button>
             {tres&&<p style={{fontSize:12,marginTop:6,color:tres==='ok'?'#15803d':'#dc2626'}}>{tmsg}</p>}
@@ -752,10 +769,11 @@ function EnglishVersionPanel({q}){
   const translate=async(e)=>{
     e.stopPropagation();
     const apiKey=s.settings.apiKey||'';
-    if(!apiKey){d({t:'NOTIF',p:{type:'error',msg:'API key required. Add it in ⚙️ Settings.'}});return;}
+    const apiKey2=s.settings.apiKey2||'';
+    if(!apiKey&&!apiKey2){d({t:'NOTIF',p:{type:'error',msg:'API key required. Add it in ⚙️ Settings.'}});return;}
     setLoad(true);
     try{
-      const result=await geminiTranslate(q,apiKey);
+      const result=await geminiTranslate(q,apiKey,apiKey2);
       upd({...result,translatedAt:Date.now()});
       setOpen(true);
       d({t:'NOTIF',p:{type:'success',msg:'Translation done! You can now edit it.'}});
@@ -904,6 +922,7 @@ function ImgUpload(){
   const[copied,setCopied]=useState(false);
   const ref=useRef();
   const apiKey=s.settings.apiKey||'';
+  const apiKey2=s.settings.apiKey2||'';
 
   const pick=files=>{
     const f=files&&files[0];if(!f)return;
@@ -911,9 +930,9 @@ function ImgUpload(){
   };
 
   const extract=async()=>{
-    if(!apiKey){setErr('API key required. Add it in ⚙️ Settings.');return;}
+    if(!apiKey&&!apiKey2){setErr('API key required. Add it in ⚙️ Settings.');return;}
     setLoad(true);setErr('');
-    try{const qs=await geminiVision(file,apiKey);setRes(qs);}
+    try{const qs=await geminiVision(file,apiKey,apiKey2);setRes(qs);}
     catch(e){setErr(e.message);}
     finally{setLoad(false);}
   };
@@ -1026,7 +1045,7 @@ function ImgUpload(){
             {result&&<button className="btn btn-secondary" onClick={()=>{setRes(null);setErr('');}}>↩ Re-extract</button>}
             <button className="btn btn-secondary" onClick={clear}>Clear</button>
           </div>
-          <p style={{fontSize:10,color:'#9ca3af',textAlign:'center'}}>Powered by Mistral AI (pixtral-12b)</p>
+          <p style={{fontSize:10,color:'#9ca3af',textAlign:'center'}}>Powered by Groq + OpenRouter (free tier)</p>
         </div>
       )}
       </>
