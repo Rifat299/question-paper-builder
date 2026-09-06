@@ -317,7 +317,7 @@ const useApp=()=>useContext(Ctx);
 /* ── Groq (primary) + OpenRouter free-router (fallback) — Vision + Translation ── */
 const GROQ_URL='https://api.groq.com/openai/v1/chat/completions';
 const GROQ_VISION_MODEL='meta-llama/llama-4-scout-17b-16e-instruct';
-const GROQ_TEXT_MODEL='llama-3.3-70b-versatile';
+const GROQ_TEXT_MODEL='openai/gpt-oss-120b';
 const OPENROUTER_URL='https://openrouter.ai/api/v1/chat/completions';
 const OPENROUTER_MODEL='openrouter/free'; // auto-picks a free vision-capable model
 function fileToB64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});}
