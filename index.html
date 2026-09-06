@@ -333,8 +333,7 @@ async function callOneProvider(url, model, messages, maxTokens, key, isVision, w
 }
 
 // Tries Groq first, falls back to OpenRouter free router on any failure (rate limit, downtime, etc.)
-async function mistralCall(messages, maxTokens=1024, apiKey='', isVision=false, apiKey2=''){
-  const wantJson=!isVision;
+async function mistralCall(messages, maxTokens=1024, apiKey='', isVision=false, apiKey2='', wantJson=false){
   const errors=[];
   if(apiKey){
     try{ return await callOneProvider(GROQ_URL, isVision?GROQ_VISION_MODEL:GROQ_TEXT_MODEL, messages, maxTokens, apiKey, isVision, wantJson); }
@@ -348,7 +347,7 @@ async function mistralCall(messages, maxTokens=1024, apiKey='', isVision=false, 
   throw new Error('All providers failed — '+errors.join(' | '));
 }
 // alias kept so geminiVision/geminiTranslate calls work unchanged
-const claudeCall=(msgs,maxTokens,apiKey,isVision,apiKey2)=>mistralCall(msgs,maxTokens,apiKey,isVision,apiKey2);
+const claudeCall=(msgs,maxTokens,apiKey,isVision,apiKey2,wantJson)=>mistralCall(msgs,maxTokens,apiKey,isVision,apiKey2,wantJson);
 
 async function geminiVision(file,key,key2){
   const b64=await fileToB64(file),mime=file.type||'image/jpeg';
@@ -365,7 +364,7 @@ Output raw transcript only. No JSON, no formatting.`;
       {type:'image_url',image_url:{url:'data:'+mime+';base64,'+b64}},
       {type:'text',text:vPrompt}
     ]}];
-    rawText=await mistralCall(vMsgs,4096,key,true,key2);
+    rawText=await mistralCall(vMsgs,4096,key,true,key2,false);
   }catch(e){throw new Error('Vision failed: '+e.message);}
   if(!rawText||rawText.length<5) throw new Error('No text found in image.');
 
@@ -397,7 +396,7 @@ Preserve all Bangla text exactly. Return only the JSON object, no markdown.`;
 
   let structured='';
   try{
-    structured=await mistralCall([{role:'user',content:sPrompt}],4096,key,false,key2);
+    structured=await mistralCall([{role:'user',content:sPrompt}],4096,key,false,key2,true);
   }catch(e){throw new Error('Structuring failed: '+e.message);}
 
   try{
@@ -456,7 +455,7 @@ function parseManualJSON(raw){
 }
 
 async function geminiTest(key,key2){
-  await mistralCall([{role:'user',content:'Reply: OK'}],10,key,false,key2);
+  await mistralCall([{role:'user',content:'Reply: OK'}],10,key,false,key2,false);
   return true;
 }
 
@@ -502,7 +501,7 @@ Output: {"stemEn":"..."}
 Additional rules: Translate only Bangla words to natural English.`;
   }
 
-  const txt=await claudeCall([{role:'user',content}],1024,key,false,key2);
+  const txt=await claudeCall([{role:'user',content}],1024,key,false,key2,true);
   try{
     const s=txt.replace(/```json\n?/gi,'').replace(/```\n?/g,'').trim();
     // try direct, then find first {...}
