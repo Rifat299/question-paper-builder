@@ -11,6 +11,9 @@
 <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.23.9/babel.min.js"></script>
+<!-- TikZJax: renders <script type="text/tikz"> into SVG in the browser (used by the TikZ diagram mode) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@rod2ik/tikzjax@1.6.0/dist/fonts.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/@rod2ik/tikzjax@1.6.0/dist/tikzjax.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html{font-family:'Inter','Hind Siliguri',sans-serif;-webkit-font-smoothing:antialiased;background:#f5f3ee}
@@ -145,6 +148,15 @@ body{min-height:100vh}
 .paste-box{width:100%;border:1px solid #e8e5de;border-radius:6px;padding:6px 10px;font-size:12px;color:#6b7299;background:#fafaf8;cursor:pointer;outline:none;caret-color:transparent;margin-top:8px;text-align:center;font-family:'Inter',sans-serif}
 .paste-box:focus{border-color:#9bb1fd;box-shadow:0 0 0 3px rgba(79,99,248,.12);color:#1a1d2e;background:#fff}
 
+/* TikZ figures */
+.tikz-box{border:1px solid #e8e5de;border-radius:8px;background:#fff;padding:8px;min-height:44px;max-height:260px;overflow:auto;text-align:center;margin-top:8px}
+.tikz-box svg{max-width:100%;height:auto}
+.tikz-fig{display:block;line-height:0}
+.tikz-fig svg{display:block;max-width:100%!important;width:auto!important;height:auto!important;max-height:var(--tikz-h,110px)!important;overflow:visible}
+.tikz-mcq{margin:4px auto 4px 18px;text-align:left}
+.tikz-cq{margin:4px auto;text-align:center}
+.tikz-cq svg{margin:0 auto}
+
 @media(max-width:760px){
   .editor-col{width:100%}.preview-col{display:none}
   .preview-col.mob-show{display:block;flex:none;width:100%}
@@ -243,9 +255,9 @@ function SmartMText({t,cls=''}){
 /* ── State ── */
 const makeQ=type=>{
   const base={id:uid(),type};
-  if(type==='mcq')return{...base,stem:'',options:{a:'',b:'',c:'',d:''},correctAnswer:'',marks:1,diagramImg:null,
+  if(type==='mcq')return{...base,stem:'',options:{a:'',b:'',c:'',d:''},correctAnswer:'',marks:1,diagramImg:null,diagramMode:'img',diagramTikz:'',diagramSvg:'',diagramH:110,
     stemEn:'',optionsEn:{a:'',b:'',c:'',d:''},translatedAt:null};
-  if(type==='cq') return{...base,stimulus:'',subA:'',subB:'',subC:'',subD:'',diagramImg:null,
+  if(type==='cq') return{...base,stimulus:'',subA:'',subB:'',subC:'',subD:'',diagramImg:null,diagramMode:'img',diagramTikz:'',diagramSvg:'',diagramH:110,
     stimulusEn:'',subAEn:'',subBEn:'',subCEn:'',subDEn:'',translatedAt:null};
   return{...base,stem:'',marks:5,stemEn:'',translatedAt:null};
 };
@@ -353,11 +365,81 @@ function normalizeQuestions(parsed){
     } else {
       o.stem=n(q.stem)||'';
     }
+    if(o.diagramTikz&&!o.diagramMode) o.diagramMode='tikz';
     return o;
   });
 }
 
-/* Copy-as-JSON for a question (diagram images are left out: they are huge base64 strings) */
+/* ── TikZ helpers ── */
+const TIKZ_EXAMPLE='\\begin{tikzpicture}\n  \\draw (0,0) -- (3,0) -- (1.2,2) -- cycle;\n  \\node[below left] at (0,0) {$A$};\n  \\node[below right] at (3,0) {$B$};\n  \\node[above] at (1.2,2) {$C$};\n\\end{tikzpicture}';
+const TIKZ_PROMPT=`You are an expert in TikZ. Redraw the attached figure (or the figure I describe below) as TikZ code.
+
+RULES
+1. Output ONLY the code: one \\begin{tikzpicture}...\\end{tikzpicture} block, optionally preceded by \\usetikzlibrary{...} lines. No \\documentclass, no \\usepackage, no markdown code fence, no explanation.
+2. The code is rendered in a web browser by TikZJax (a small TeX engine), so use plain TikZ. If you need libraries, keep to common ones: calc, arrows.meta, angles, quotes, positioning, intersections, patterns.
+3. All labels must be Latin letters, digits or math written as $...$ (for example $A$, $x$, $30^\\circ$). Do NOT put Bangla text inside the figure.
+4. Keep the figure compact (coordinates roughly within 6 x 5 units). Black and white only, because it will be printed.
+5. Do not load external files or images.
+6. give the response in a text box.
+
+`;
+
+/* Make a captured/pasted SVG safe to inline: drop scripts, event handlers, javascript: links */
+const _svgCache=new Map();
+function sanitizeSvg(str){
+  if(!str||typeof str!=='string')return '';
+  if(_svgCache.has(str))return _svgCache.get(str);
+  let out='';
+  try{
+    let src=str;
+    if(!/<svg[^>]*\sxmlns=/.test(src)) src=src.replace(/<svg\b/,'<svg xmlns="http://www.w3.org/2000/svg"');
+    if(/xlink:/.test(src)&&!/xmlns:xlink/.test(src)) src=src.replace(/<svg\b/,'<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
+    const doc=new DOMParser().parseFromString(src,'image/svg+xml');
+    const root=doc.documentElement;
+    if(root&&root.nodeName.toLowerCase()==='svg'&&!doc.querySelector('parsererror')){
+      root.querySelectorAll('script,foreignObject,iframe,object,embed').forEach(el=>el.remove());
+      [root,...root.querySelectorAll('*')].forEach(el=>{
+        [...el.attributes].forEach(a=>{
+          const nm=a.name.toLowerCase();
+          if(nm.startsWith('on')||((nm==='href'||nm.endsWith(':href'))&&/^\s*javascript:/i.test(a.value)))el.removeAttribute(a.name);
+        });
+      });
+      out=new XMLSerializer().serializeToString(root);
+    }
+  }catch(e){out='';}
+  _svgCache.set(str,out);
+  return out;
+}
+/* Turn the engine's rendered <svg> into stored markup: ensure viewBox/size, make ids unique per question */
+function prepareSvg(svg,prefix){
+  const num=a=>/%\s*$/.test(a||'')?0:parseFloat(a);
+  const c=svg.cloneNode(true);
+  const r=svg.getBoundingClientRect();
+  if(!c.getAttribute('viewBox')){
+    const w=num(c.getAttribute('width'))||r.width,h=num(c.getAttribute('height'))||r.height;
+    if(!(w>0&&h>0))return '';
+    c.setAttribute('viewBox','0 0 '+w+' '+h);
+  }
+  if(!(num(c.getAttribute('width'))>0)||!(num(c.getAttribute('height'))>0)){
+    const p=c.getAttribute('viewBox').split(/[\s,]+/).map(Number);
+    if(!(p[2]>0&&p[3]>0))return '';
+    c.setAttribute('width',p[2]);c.setAttribute('height',p[3]);
+  }
+  c.querySelectorAll('script,foreignObject').forEach(el=>el.remove());
+  let s=new XMLSerializer().serializeToString(c);
+  [...new Set([...s.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]))].forEach(id=>{
+    const nid=prefix+'_'+id;
+    const esc=id.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    s=s.replace(new RegExp('id="'+esc+'"','g'),'id="'+nid+'"')
+       .replace(new RegExp('url\\(#'+esc+'\\)','g'),'url(#'+nid+')')
+       .replace(new RegExp('href="#'+esc+'"','g'),'href="#'+nid+'"');
+  });
+  return s;
+}
+/* Does this svg look like the engine's loading spinner rather than the finished diagram? */
+const isLoaderSvg=s=>!!(s.querySelector('animate,animateTransform,animateMotion')||/load|spin/i.test((s.getAttribute('class')||'')+' '+((s.parentElement&&s.parentElement.getAttribute&&s.parentElement.getAttribute('class'))||'')));
+
+/* Copy-as-JSON for a question (uploaded diagram images are left out: they are huge base64 strings; TikZ code and its SVG are kept) */
 function questionToJSON(q){
   const {id,diagramImg,...rest}=q;
   return JSON.stringify(rest,null,2);
@@ -407,7 +489,7 @@ RULES
 3. Keep roman numerals (i., ii., iii.) exactly as they are.
 4. Keep every "no" value and keep the questions in the same order.
 5. If an input field is empty, return an empty string for it.
-6. Reply with ONLY one valid JSON object — no markdown, no code fence, no explanation. Give the json in a text-box.
+6. Reply with ONLY one valid JSON object — no markdown, no code fence, no explanation. Give json in a text-box.
 
 OUTPUT FORMAT
 {"translations":[ ...one object per question... ]}
@@ -561,6 +643,134 @@ function DiagramUpload({q,label='📐 Add Diagram (optional)'}){
   );
 }
 
+/* ── TikZ diagram editor: type TikZ code → TikZJax renders it → SVG is stored with the question ── */
+function TikzEditor({q}){
+  const{d}=useApp();
+  const boxRef=useRef(null);
+  const obs=useRef(null),settle=useRef(null),tmo=useRef(null),deb=useRef(null),evRef=useRef(null);
+  const[code,setCode]=useState(q.diagramTikz||'');
+  const[status,setStatus]=useState('idle'); // idle | rendering | ok | error
+  const[msg,setMsg]=useState('');
+  const[copied,setCopied]=useState(false);
+  const prefix='tk'+String(q.id).replace(/\W/g,'');
+
+  const stop=()=>{
+    if(obs.current){obs.current.disconnect();obs.current=null;}
+    clearTimeout(settle.current);clearTimeout(tmo.current);
+    if(evRef.current){window.removeEventListener('tikzjax-load-finished',evRef.current,true);evRef.current=null;}
+  };
+  useEffect(()=>()=>{stop();clearTimeout(deb.current);},[]);
+
+  /* Take the finished <svg> out of the render box and save it on the question */
+  const grab=force=>{
+    const box=boxRef.current;if(!box)return false;
+    const all=[...box.querySelectorAll('svg')];
+    const svgs=force?all:all.filter(s=>!isLoaderSvg(s));
+    if(!svgs.length)return false;
+    const markup=prepareSvg(svgs[svgs.length-1],prefix);
+    if(!markup)return false;
+    d({t:'UPD_Q',id:q.id,p:{diagramSvg:markup,diagramMode:'tikz'}});
+    setStatus('ok');setMsg('');stop();
+    return true;
+  };
+
+  const render=src=>{
+    const box=boxRef.current;if(!box)return;
+    stop();box.innerHTML='';
+    if(!src.trim()){setStatus('idle');setMsg('');d({t:'UPD_Q',id:q.id,p:{diagramSvg:''}});return;}
+    setStatus('rendering');setMsg('');
+    evRef.current=()=>setTimeout(()=>grab(true),60);
+    window.addEventListener('tikzjax-load-finished',evRef.current,true);
+    obs.current=new MutationObserver(()=>{
+      clearTimeout(settle.current);
+      settle.current=setTimeout(()=>{
+        if(grab(false))return;
+        if(/error|emergency stop|undefined control sequence|runaway|missing/i.test(box.textContent||'')){
+          setStatus('error');setMsg('The TikZ engine reported a problem — see the message in the box below, fix the code and render again.');stop();
+        }
+      },2500);
+    });
+    obs.current.observe(box,{childList:true,subtree:true,characterData:true});
+    tmo.current=setTimeout(()=>{stop();setStatus('error');setMsg('No output after 60 seconds. Check your internet connection (the TeX engine is downloaded on first use) and the TikZ code.');},60000);
+    const sc=document.createElement('script');
+    sc.type='text/tikz';sc.textContent=src;
+    box.appendChild(sc);
+  };
+
+  /* On open: show the stored SVG straight away; render only if there is code but no SVG yet */
+  useEffect(()=>{
+    const box=boxRef.current;if(!box)return;
+    if(q.diagramSvg){box.innerHTML=sanitizeSvg(q.diagramSvg);setStatus('ok');}
+    else if((q.diagramTikz||'').trim())render(q.diagramTikz);
+  },[]);
+
+  const onCode=v=>{
+    setCode(v);
+    d({t:'UPD_Q',id:q.id,p:{diagramTikz:v}});
+    clearTimeout(deb.current);
+    deb.current=setTimeout(()=>render(v),1500);
+  };
+  const copyPrompt=async()=>{
+    const ok=await copyText(TIKZ_PROMPT);
+    if(ok){setCopied(true);setTimeout(()=>setCopied(false),1800);}
+    else d({t:'NOTIF',p:{type:'error',msg:'Could not copy. Check browser clipboard permission.'}});
+  };
+  const clearAll=()=>{
+    stop();clearTimeout(deb.current);
+    if(boxRef.current)boxRef.current.innerHTML='';
+    setCode('');setStatus('idle');setMsg('');
+    d({t:'UPD_Q',id:q.id,p:{diagramTikz:'',diagramSvg:''}});
+  };
+  const statusTxt={idle:'',rendering:'⏳ Rendering… the first diagram downloads the TeX engine and can take 10–30 s.',ok:'✅ Rendered and saved with the question.',error:'⚠️ '+msg}[status];
+
+  return(
+    <div style={{marginTop:8,display:'flex',flexDirection:'column',gap:8}} onClick={e=>e.stopPropagation()}>
+      <textarea className="ta ta-code" rows={8} spellCheck={false} style={{background:'#faf5ff',borderColor:'#c4b5fd'}}
+        placeholder={TIKZ_EXAMPLE} value={code} onChange={e=>onCode(e.target.value)}/>
+      <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+        <button className="btn btn-primary btn-sm" onClick={()=>{clearTimeout(deb.current);render(code);}} disabled={!code.trim()||status==='rendering'}>▶ Render now</button>
+        <button className="btn btn-secondary btn-sm" onClick={copyPrompt}>{copied?'✅ Copied!':'📋 Copy TikZ prompt for AI'}</button>
+        <label style={{display:'flex',alignItems:'center',gap:4,fontSize:12,color:'#6b7299'}}>Max height
+          <input type="number" min={40} max={400} className="inp" style={{width:64,textAlign:'center',padding:'4px 6px'}} value={q.diagramH||110}
+            onChange={e=>d({t:'UPD_Q',id:q.id,p:{diagramH:Math.max(40,Math.min(400,parseInt(e.target.value)||110))}})}/>px
+        </label>
+        <div style={{flex:1}}/>
+        {(code||q.diagramSvg)&&<button className="btn btn-danger btn-sm" onClick={clearAll}>✕ Clear</button>}
+      </div>
+      {statusTxt&&<div style={{fontSize:12,color:status==='error'?'#dc2626':status==='ok'?'#15803d':'#6b7299',lineHeight:1.6}}>{statusTxt}</div>}
+      <div ref={boxRef} className="tikz-box"/>
+      <p style={{fontSize:11,color:'#9ca3af',lineHeight:1.6}}>Labels must be Latin letters, digits or math like <code>$A$</code> — the TikZ engine cannot draw Bangla text. Put any <code>\usetikzlibrary{'{...}'}</code> line before <code>\begin{'{tikzpicture}'}</code>. For Bangla labels, use the Image mode instead.</p>
+    </div>
+  );
+}
+
+/* Switch between uploaded image and TikZ for one diagram slot */
+function DiagramField({q,label}){
+  const{d}=useApp();
+  const mode=q.diagramMode==='tikz'?'tikz':'img';
+  const set=m=>d({t:'UPD_Q',id:q.id,p:{diagramMode:m}});
+  return(
+    <div onClick={e=>e.stopPropagation()}>
+      <div style={{display:'flex',gap:6,marginTop:8}}>
+        <button className={mode==='img'?'btn btn-primary btn-sm':'btn btn-secondary btn-sm'} onClick={()=>set('img')}>🖼️ Image</button>
+        <button className={mode==='tikz'?'btn btn-primary btn-sm':'btn btn-secondary btn-sm'} onClick={()=>set('tikz')}>📐 TikZ</button>
+      </div>
+      {mode==='img'?<DiagramUpload q={q} label={label}/>:<TikzEditor q={q}/>}
+    </div>
+  );
+}
+
+/* The figure as it appears on the paper (image or inline TikZ SVG) */
+function FigureView({q,kind}){
+  if(q.diagramMode==='tikz'){
+    const html=sanitizeSvg(q.diagramSvg);
+    if(!html)return null;
+    return <div className={'tikz-fig tikz-'+kind} style={{'--tikz-h':(q.diagramH||110)+'px'}} dangerouslySetInnerHTML={{__html:html}}/>;
+  }
+  if(q.diagramImg)return <img src={q.diagramImg} alt="figure" className={kind==='mcq'?'mcq-diag':'cq-stim-img'}/>;
+  return null;
+}
+
 /* MCQ form */
 function MCQForm({q}){
   const{s,d}=useApp();
@@ -570,7 +780,7 @@ function MCQForm({q}){
   return(
     <div style={{display:'flex',flexDirection:'column',gap:10}}>
       <div><label className="lbl">Question Stem</label><textarea className="ta" rows={3} placeholder="Type MCQ... use $x^2$ for math" value={q.stem||''} onChange={e=>upd({stem:e.target.value})}/></div>
-      <DiagramUpload q={q} label="📐 Add Figure/Diagram to this MCQ (optional)"/>
+      <DiagramField q={q} label="📐 Add Figure/Diagram to this MCQ (optional)"/>
       {['a','b','c','d'].map(k=>(
         <div key={k} className="opt-row">
           <div className="opt-lbl">{L[k]}</div>
@@ -599,7 +809,7 @@ function CQForm({q}){
       <div>
         <label className="lbl">উদ্দীপক / Stimulus</label>
         <textarea className="ta" rows={4} style={{background:'#fffbeb',borderColor:'#fcd34d'}} placeholder="Type stimulus/passage here..." value={q.stimulus||''} onChange={e=>upd({stimulus:e.target.value})}/>
-        <DiagramUpload q={q} label="📐 Add Stimulus Diagram/Figure (optional)"/>
+        <DiagramField q={q} label="📐 Add Stimulus Diagram/Figure (optional)"/>
       </div>
       <div style={{display:'flex',alignItems:'center',gap:8,color:'#9ca3af',fontSize:11}}>
         <div style={{flex:1,height:1,background:'#e8e5de'}}/> Sub-questions <div style={{flex:1,height:1,background:'#e8e5de'}}/>
@@ -996,7 +1206,7 @@ function Preview({forPDF}){
                 <span className="qstem-num">{num(i+1)}.</span>
                 <span style={{flex:1}}><SmartMText t={txt(q.stem,q.stemEn)}/></span>
               </div>
-              {q.diagramImg&&<img src={q.diagramImg} alt="figure" className="mcq-diag"/>}
+              <FigureView q={q} kind="mcq"/>
               <div className="mcq-opts">
                 {['a','b','c','d'].map(k=>(
                   <div key={k} className={'mcq-opt'+(sa&&q.correctAnswer===k?' correct-opt':'')}>
@@ -1060,7 +1270,7 @@ function CQPreview({q,i,tr,lang,isEN,txt,num}){
       {(q.stimulus||q.stimulusEn)?
         <div className="cq-stim-box" style={{display:'flex',gap:3}}><span className="qstem-num" style={{fontWeight:700}}>{num(i+1)}.</span><span><MText t={txt(q.stimulus,q.stimulusEn)}/></span></div>
         :<div className="qstem" style={{fontWeight:700}}><span className="qstem-num">{num(i+1)}.</span></div>}
-      {q.diagramImg&&<img src={q.diagramImg} alt="diagram" className="cq-stim-img"/>}
+      <FigureView q={q} kind="cq"/>
       <div className="cq-subs">
         {subMeta.map(sub=>{
           const content=txt(q[sub.k],q[sub.kEn]);
@@ -1170,10 +1380,6 @@ function App(){
   return(
     <div>
       <Toolbar/>
-      {/* Hidden PDF target */}
-      <div style={{position:'fixed',top:'-99999px',left:0,width:'794px',visibility:'hidden',zIndex:-1}} aria-hidden="true">
-        <Preview forPDF={true}/>
-      </div>
       <div className="main">
         <div className={'editor-col'+(tab==='preview'?' mob-hide':'')}>
           <HeaderEditor/>
