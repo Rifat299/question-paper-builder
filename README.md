@@ -2,7 +2,7 @@
 
 **Live app:** https://rifat299.github.io/question-paper-builder/
 
-A free browser tool for Bangladeshi educators to build and export SSC/HSC exam papers. No installation. Runs entirely in your browser.
+A free browser tool for Bangladeshi educators to build and export SSC/HSC exam papers. No installation, no account, no API keys. Runs entirely in your browser.
 
 ---
 
@@ -10,7 +10,7 @@ A free browser tool for Bangladeshi educators to build and export SSC/HSC exam p
 
 You type in the questions. The app formats them into an A4 paper — two-column layout, board-standard font sizes, section dividers, proper header with school name and exam info. Then you print it to PDF.
 
-It also reads question papers from photos. Upload a picture of an existing paper, and Mistral AI pulls out all the questions and drops them into the editor.
+It works with AI **manually**: the app gives you ready-made prompts, you run them in the AI of your choice (Claude, Gemini, ChatGPT), and you paste the JSON reply back. The app itself makes no AI calls and needs no API key.
 
 ---
 
@@ -18,7 +18,7 @@ It also reads question papers from photos. Upload a picture of an existing paper
 
 **MCQ (বহুনির্বাচনি)** — stem with four options. Choose ক/খ/গ/ঘ or a/b/c/d labels in Settings. Mark the correct answer for an answer key, and toggle whether the preview shows it. Any MCQ can have an optional figure attached.
 
-**Creative Question (সৃজনশীল)** — উদ্দীপক (stimulus) followed by four sub-questions: knowledge, comprehension, application, higher-order. Standard 10-mark CQ format, with the 1+2+3+4 split for regular subjects. If you leave the higher-order field blank, the app recognizes it as a math CQ and shows the 2+4+4 split instead. Diagrams supported in the stimulus.
+**Creative Question (সৃজনশীল)** — উদ্দীপক (stimulus) followed by four sub-questions: knowledge, comprehension, application, higher-order. Standard 10-mark CQ format, with the 1+2+3+4 split for regular subjects. If you leave the higher-order field blank, the app recognizes it as a math CQ and shows the 2+4+4 split instead. Figures supported in the stimulus.
 
 **Short Question** — open-ended, configurable marks.
 
@@ -33,24 +33,45 @@ School name, exam title, subject, subject code, time, total marks, set, year, in
 Right panel updates as you type. The column layout fills left-first, the same way board papers print. What you see in the preview is what comes out on paper. On phones, an Edit/Preview tab switcher swaps between the two so you're not squinting at a split screen.
 
 ### Math
-Wrap equations in `$...$` for inline or `$$...$$` for a display block. KaTeX renders them in real time.
+Wrap equations in `$...$` for inline or `$$...$$` for a display block. KaTeX renders them in real time. Equations written as `\( ... \)` or `\[ ... \]` (common in AI replies) are converted automatically.
 
 ```
 $a^2 + b^2 = c^2$
 $$\frac{-b \pm \sqrt{b^2-4ac}}{2a}$$
 ```
 
-### AI image extraction
-Upload or paste a photo of any question paper and Mistral reads it in two passes — first an OCR-style transcript of the page, then a pass that turns that transcript into structured MCQ/CQ/SQ entries. It picks up Bangla text, math, MCQ options, and CQ structure. Requires a free API key from Mistral (see setup).
+### Import questions with AI (no API key)
+1. Click **Copy Extraction Prompt**.
+2. Open Claude, Gemini or ChatGPT, attach a photo of a question paper, and paste the prompt.
+3. Paste the JSON reply into the import box, click **Parse JSON**, review the list, then click **Import**.
 
-### Manual JSON question input from OutSide AI response
-MCQ/CQ/SQ can be added via json format generated from external ai response. Copy prompt from manual input section and give to AI to generate JSON response. This json will automatically input question on paper.
+The importer is forgiving: it strips code fences and surrounding chatter, repairs stray backslashes in LaTeX, and accepts a single question, a list, or `{"questions": [...]}`.
 
-### English version
-Each question card has a **Translate with AI** button at the bottom. One click sends the question to Mistral and gets back an English translation — the LaTeX inside `$...$` is left untouched so equations don't break. The translation is editable. Switch the toolbar to **📄EN** and the preview shows the English version. Two papers from one session.
+### English version (manual translation)
+- Each question card has **Copy Bangla Q + AI prompt**. It copies the Bangla question plus instructions for the AI: translate naturally, leave everything inside `$...$` untouched, reply with JSON only.
+- Paste the AI's reply into the JSON box on the card and click **Apply to English fields**. The English fields stay editable, and you can also type the translation by hand.
+- **Translate all** (above the question list) builds one prompt for every question — or only those without English yet — and applies the reply question by question using the `no` values.
+- Switch the toolbar to **📄EN** and the preview and printed paper show the English version. Two papers from one session.
 
-### Diagrams
-MCQ and CQ questions both accept images. Drag a file, click to browse, or click the paste box and press Ctrl+V to grab from clipboard. Images scale to fit the column.
+### Diagrams: image or TikZ
+Every figure slot (MCQ figure, CQ stimulus figure) has an **Image / TikZ** switch.
+
+- **Image** — drag a file, click to browse, or click the paste box and press Ctrl+V. Images scale to fit the column. Use this for figures with Bangla labels.
+- **TikZ** — paste TikZ code and the figure is drawn in the browser with a live preview, stored as vector SVG with the question, so it stays crisp in print. Set a max height per figure. **Copy TikZ prompt for AI** gives you instructions to use with a photo of the figure.
+
+TikZ notes:
+- Rendering uses [TikZJax](https://github.com/rod2ik/tikzjax) (loaded from the jsDelivr CDN). The first diagram downloads the TeX engine and can take 10–30 seconds; you need an internet connection for rendering new TikZ code.
+- Labels must be Latin letters, digits or math like `$A$` — the engine cannot typeset Bangla text.
+- Put any `\usetikzlibrary{...}` line before `\begin{tikzpicture}`. Only common TikZ libraries are supported.
+
+### Copy and paste questions as JSON
+- **📋 JSON** on any question card copies that question.
+- **📥 Paste JSON** adds a copied question (or a list) as new questions at the end — in the same paper or a different one.
+- **Copy all as JSON** copies every question.
+- TikZ code and its SVG are included in the copied JSON. Uploaded images are not (they are too large) — re-attach them.
+
+### Autosave, Save and Load
+Your paper is autosaved in the browser as you work. **Save** downloads the whole paper (header, questions, figures, paper language) as a `.qpb.json` progress file; **Load** restores it later or on another computer.
 
 ### Reorder
 Drag the ⠿ handle on any card to move it. Preview updates instantly.
@@ -60,22 +81,6 @@ Drag the ⠿ handle on any card to move it. Preview updates instantly.
 
 ### Clear all
 One button wipes the current paper — header and questions both — with a confirmation prompt first.
-
----
-
-## Setup
-
-The app works immediately at https://rifat299.github.io/question-paper-builder/ for everything except AI features.
-
-### Mistral API key (needed for image extraction and translation)
-
-1. Go to [console.mistral.ai](https://console.mistral.ai/api-keys), sign in
-2. Create an API key and copy it
-3. In the app: click **⚙️** → paste the key → **Test Key** → **Save Settings**
-
-The key is stored in your browser's `localStorage`. It never goes to any server except Mistral's API.
-
-Extraction uses `pixtral-12b-2409` for reading the image, and `mistral-small-latest` for both structuring the result and translating questions. Check Mistral's console for current free-tier limits.
 
 ---
 
@@ -89,22 +94,23 @@ Extraction uses `pixtral-12b-2409` for reading the image, and `mistral-small-lat
 5. Click **Print** when done and save as PDF
 
 **Extract questions from a photo**
-1. Add your Mistral API key in ⚙️ Settings
-2. In **AI Image Extraction**, drag a photo in, click to browse, or click the paste box and press Ctrl+V
-3. Click **Extract with Mistral**
-4. Review the extracted questions, click **Import**
+1. In **Import Questions from AI**, click **Copy Extraction Prompt**
+2. Run it in Claude / Gemini / ChatGPT with your photo attached
+3. Paste the JSON reply, click **Parse JSON**, review, then **Import**
 
 **Generate an English version**
-1. Expand any question card
-2. Scroll to the bottom — click **✨ Translate with AI**
-3. Edit the translation if anything looks off
-4. Click **📄EN** in the toolbar
-5. Print the English version
+1. On a question card, click **Copy Bangla Q + AI prompt** (or use **Translate all** for the whole paper)
+2. Run it in your AI and copy the JSON reply
+3. Paste it into the JSON box and click **Apply**; edit the wording if needed
+4. Click **📄EN** in the toolbar and print
 
 **Add a diagram**
 1. Expand any MCQ or CQ card
-2. Find **📐 Add Diagram**
-3. Drag an image in, click to browse, or click the paste box and press Ctrl+V
+2. Choose **🖼️ Image** (drag, browse, or Ctrl+V) or **📐 TikZ** (paste code, check the preview)
+
+**Reuse a question**
+1. Click **📋 JSON** on the question
+2. In any paper, click **📥 Paste JSON** and paste
 
 ---
 
@@ -127,10 +133,10 @@ Include what you expected, what happened, your browser and OS, and a screenshot 
 
 ### Things worth contributing
 
-- Save/load paper as JSON
 - More question types (fill-in-the-blank, matching)
 - Better print page-break handling for long papers
 - Print CSS refinements
+- Offline TikZ rendering (bundle the TeX engine)
 
 ---
 
@@ -141,8 +147,8 @@ Include what you expected, what happened, your browser and OS, and a screenshot 
 | React 18 | UI |
 | Babel Standalone | JSX without a build step |
 | KaTeX | Math rendering |
+| TikZJax | TikZ diagrams rendered to SVG in the browser |
 | Browser print | PDF export |
-| Mistral Pixtral 12B + Mistral Small | AI extraction and translation |
 | Noto Serif Bengali, Hind Siliguri, Inter | Fonts |
 
 ---
